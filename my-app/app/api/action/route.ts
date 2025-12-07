@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       })
 
       // Create Audit Log
-      const logMessage = `Team ${team.name} captured ${node.name}!`
+      const logMessage = `【作戦報告】${team.name}小隊がエリア「${node.name}」を制圧完了！`
       const linkLog = await prisma.auditLog.create({
         data: {
           message: logMessage,
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         action: 'CAPTURE',
-        message: `You captured ${node.name}!`,
+        message: `エリア「${node.name}」の制圧に成功。`,
         node: updatedNode,
       })
 
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           success: false,
           action: 'HARVEST',
-          message: 'Resources regenerate every minute. Wait a bit!',
+          message: '資源再生サイクル中。待機せよ。',
         })
       }
 
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
          return NextResponse.json({
           success: false,
           action: 'HARVEST',
-          message: 'No resources to harvest yet.',
+          message: '回収可能な資源なし。',
         })
       }
 
@@ -107,7 +107,8 @@ export async function POST(req: NextRequest) {
       })
 
        // Create Audit Log
-      const logMessage = `Team ${team.name} collected ${amount} ${node.type} from ${node.name}.`
+      const unit = node.type === 'WATER' ? 'L' : 'kg'
+      const logMessage = `【物資回収】${team.name}小隊が${node.name}にて${node.type}を${amount}${unit}確保。`
       const linkLog = await prisma.auditLog.create({
         data: {
           message: logMessage,
@@ -131,7 +132,7 @@ export async function POST(req: NextRequest) {
        return NextResponse.json({
         success: true,
         action: 'HARVEST',
-        message: `Harvested ${amount} ${node.type}!`,
+        message: `物資回収完了: ${amount}${unit} (${node.type})`,
         amount: amount,
       })
     }

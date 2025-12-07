@@ -33,11 +33,12 @@ async function main() {
   await prisma.node.deleteMany()
 
   const initialNodes = [
-    { name: 'センター', type: 'AMMO', x: 50, y: 50, captureRate: 50 },
-    { name: '北哨所', type: 'MEAT', x: 50, y: 20, captureRate: 20 },
-    { name: '南基地', type: 'VEGETABLE', x: 50, y: 80, captureRate: 20 },
-    { name: '西塔', type: 'AMMO', x: 20, y: 50, captureRate: 30 },
-    { name: '東堡', type: 'AMMO', x: 80, y: 50, captureRate: 30 },
+    { name: 'セントラル・キッチン', type: 'SPICE', x: 50, y: 50, captureRate: 100 },
+    { name: '第1精肉プラント', type: 'MEAT', x: 50, y: 15, captureRate: 50 },
+    { name: '第2精肉プラント', type: 'MEAT', x: 20, y: 80, captureRate: 50 },
+    { name: '水耕栽培ドームA', type: 'VEGETABLE', x: 80, y: 20, captureRate: 40 },
+    { name: '水耕栽培ドームB', type: 'VEGETABLE', x: 15, y: 50, captureRate: 40 },
+    { name: '浄水セクター', type: 'WATER', x: 85, y: 85, captureRate: 30 },
   ]
 
   for (const n of initialNodes) {
