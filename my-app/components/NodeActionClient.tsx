@@ -38,30 +38,24 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
       if (holdInterval.current) clearInterval(holdInterval.current)
     }
   }, [])
-
-  const handleSetTeam = (teamName: string) => {
-    setSelectedTeam(teamName)
-    localStorage.setItem('my-team', teamName)
+  const handleSetTeam = (team: string) => {
+    setSelectedTeam(team)
+    localStorage.setItem('my-team', team)
   }
 
-  // Scanner Callback (Fallback for in-page scan)
-  const onScanCode = async (scannedData: string) => {
-    if (!scannedData) return
-    if (scannedData !== node.id) {
-      toast.error('ターゲット不一致: 位置情報を確認せよ')
-      return
+  const onScanCode = (code: string) => {
+    if (code) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('verified', 'true')
+      router.push(`?${params.toString()}`)
+      setIsScanning(false)
+      toast.success('アクセス権限認証完了')
     }
-    setIsScanning(false)
-    router.push(`/node/${node.id}?verified=true`)
-    toast.success("認証完了: アクセス権限承認")
   }
 
-  // Action Logic
   const handleAction = async () => {
-    if (!selectedTeam) {
-      toast.error('所属部隊が不明です')
-      return
-    }
+    if (!selectedTeam) return
+
     setLoading(true)
     try {
       const res = await fetch('/api/action', {
@@ -70,9 +64,9 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
         body: JSON.stringify({ nodeId: node.id, teamName: selectedTeam })
       })
       const data = await res.json()
-      
+
       if (!res.ok) {
-        toast.error(data.error || '実行エラー')
+        toast.error(data.error || 'エラーが発生しました')
       } else {
         if (data.success) {
           toast.success(data.message)
@@ -85,6 +79,7 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
         }
       }
     } catch (e) {
+      console.error(e)
       toast.error('通信エラーが発生')
       setProgress(0)
     } finally {

@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Shield, ChevronRight, Eye } from 'lucide-react'
+import { useState } from 'react'
+import LoadingOverlay from './ui/LoadingOverlay'
 
 type Team = {
   id: string
@@ -13,18 +15,27 @@ type Team = {
 
 export default function LandingClient({ teams }: { teams: Team[] }) {
   const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
 
   const handleSelect = (teamName: string) => {
+    setIsLoading(true)
     localStorage.setItem('my-team', teamName)
-    router.push(`/game?team=${teamName}`)
+    // Small delay to ensure overlay renders before navigation freeze
+    setTimeout(() => {
+        router.push(`/game?team=${teamName}`)
+    }, 10)
   }
 
   const handleSpectator = () => {
-    router.push('/game?mode=spectator')
+    setIsLoading(true)
+    setTimeout(() => {
+        router.push('/game?mode=spectator')
+    }, 10)
   }
 
   return (
     <div className="flex flex-col items-center min-h-screen bg-zinc-950 relative overflow-y-auto overflow-x-hidden p-4 font-mono pb-safe">
+       {isLoading && <LoadingOverlay />}
        {/* Background */}
        <div className="fixed inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-0 bg-size-[100%_2px,3px_100%] pointer-events-none opacity-50"></div>
        <div className="fixed inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,black_100%)] z-1 pointer-events-none"></div>

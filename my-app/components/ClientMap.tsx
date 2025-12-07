@@ -3,12 +3,12 @@
 import { useEffect, useState, useRef } from 'react'
 import { pusherClient } from '@/lib/pusher'
 import { format } from 'date-fns'
-import Link from 'next/link'
 import { Radio, Target, Eye } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import QRScanner from './QRScanner'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
+import LoadingOverlay from './ui/LoadingOverlay'
 
 // Define types locally since Prisma client might not be generated yet in dev environment
 type Team = {
@@ -49,6 +49,7 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
   const [teams, setTeams] = useState<Team[]>(initialTeams)
   const [logs, setLogs] = useState<AuditLog[]>(initialLogs)
   const [isScanning, setIsScanning] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
   const [myTeam, setMyTeam] = useState<string>('')
   
   const router = useRouter()
@@ -70,7 +71,7 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
         // State更新のループを防ぐため、現在の値と比較してから更新
         setMyTeam(prev => {
             if (prev !== teamParam) {
-                toast.success(`所属確認: ${teamParam}小隊`, { position: 'top-center' })
+                toast.success(`所属確認: ${teamParam}チーム`, { position: 'top-center' })
                 return teamParam
             }
             return prev
@@ -93,9 +94,25 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
 
   const onGlobalScan = (data: string) => {
     if (data) {
-        setIsScanning(false)
-        router.push(`/node/${data}?verified=true`)
-        toast.success("ターゲット捕捉・アクセス開始")
+        try {
+            // New JSON format { id, secret }
+            const parsed = JSON.parse(data)
+            if (parsed.id && parsed.secret) {
+                // Store secret credential
+                sessionStorage.setItem(`node-secret-${parsed.id}`, parsed.secret)
+                
+                setIsScanning(false)
+                router.push(`/node/${parsed.id}`) // No verified param needed
+                toast.success("セキュリティ認証成功: アクセス権限取得")
+                return
+            }
+        } catch (e) {
+            // Fallback for old format or invalid data
+            console.log("Legacy format or invalid JSON")
+        }
+
+        // Old logic (should we keep it? User said "abolish URL param". But maybe good for fallback if needed. User was strict "completely prevent". So let's strict fail if not valid.)
+        toast.error("無効なQRコードです")
     }
   }
 
@@ -152,6 +169,7 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
 
   return (
     <div className="relative w-full h-screen text-white bg-zinc-950 overflow-hidden font-mono tracking-tight selection:bg-cyan-500/30">
+      {isLoading && <LoadingOverlay />}
       
       {/* Screen Overlays (Fixed) */}
       <div className="absolute inset-0 pointer-events-none z-20">
@@ -232,58 +250,67 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
                     className="w-full h-full object-cover opacity-80"
                     draggable={false}
                   />
-                  {/* Optional Grid Overlay on top of image for effect */}
-                  <div className="absolute inset-0 opacity-30 pointer-events-none mix-blend-overlay"
-                    style={{
-                      backgroundImage: 'linear-gradient(#00ff00 1px, transparent 1px), linear-gradient(90deg, #00ff00 1px, transparent 1px)',
-                      backgroundSize: '100px 100px'
-                    }}
-                  />
+              {/* Optional Grid Overlay on top of image for effect - LESS INTENSE */}
+              <div className="absolute inset-0 opacity-20 pointer-events-none"
+                style={{
+                  backgroundImage: 'linear-gradient(#00ff00 1px, transparent 1px), linear-gradient(90deg, #00ff00 1px, transparent 1px)',
+                  backgroundSize: '100px 100px'
+                }}
+              />
             </div>
 
             {/* Nodes */}
             {nodes.map(node => (
-              <Link href={isSpectator ? '#' : `/node/${node.id}`} key={node.id} onClick={(e) => isSpectator && e.preventDefault()}>
-                <div 
-                  className={`absolute transform -translate-x-1/2 -translate-y-1/2 group ${isSpectator ? 'cursor-default' : 'cursor-pointer'}`}
-                  style={{ left: `${node.x}%`, top: `${node.y}%` }}
-                >
+              <div
+                key={node.id}
+                onClick={(e) => {
+                    if (isSpectator) return
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setIsLoading(true)
+                    // Small timeout to let state update and overlay render
+                    setTimeout(() => {
+                        router.push(`/node/${node.id}`)
+                    }, 0)
+                }}
+                className={`absolute transform -translate-x-1/2 -translate-y-1/2 group z-20 ${isSpectator ? 'cursor-default' : 'cursor-pointer'}`}
+                style={{ left: `${node.x}%`, top: `${node.y}%` }}
+              >
                   <div className="relative flex flex-col items-center">
-                    {/* Pin Icon */}
+                    {/* Pin Icon - OPTIMIZED: No blur, no heavy shadow */}
                     <div 
-                      className="w-24 h-24 clip-path-hexagon flex items-center justify-center bg-black/80 shadow-[0_0_15px_currentColor] transition-all duration-300 group-hover:scale-110 group-hover:bg-zinc-800 border-4"
+                      className="w-24 h-24 clip-path-hexagon flex items-center justify-center bg-black/90 transition-transform duration-150 group-hover:scale-105 border-4"
                       style={{ 
                         borderColor: getTeamColor(node.controlledById), 
-                        color: getTeamColor(node.controlledById), 
-                        boxShadow: `0 0 40px ${getTeamColor(node.controlledById)}66` 
+                        color: getTeamColor(node.controlledById),
+                        // Removed heavy box-shadow
                       }}
                     >
-                        <span className="text-5xl filter drop-shadow-md">{getTypeIcon(node.type)}</span>
+                        <span className="text-5xl filter drop-shadow-sm">{getTypeIcon(node.type)}</span>
                     </div>
                     
-                    {/* Connection Line & Base */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] border border-current rounded-full opacity-10 animate-pulse pointer-events-none" style={{ color: getTeamColor(node.controlledById) }}></div>
+                    {/* Connection Line & Base - Reduced opacity/animation impact */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] border border-current rounded-full opacity-10 pointer-events-none" style={{ color: getTeamColor(node.controlledById) }}></div>
 
-                    {/* Label */}
+                    {/* Label - Reduced blur */}
                     <div className="mt-4" style={{ color: getTeamColor(node.controlledById) }}>
-                      <div className="text-base font-black uppercase tracking-widest bg-black/80 px-4 py-1 border border-current shadow-lg backdrop-blur-md text-center whitespace-nowrap">
+                      <div className="text-base font-black uppercase tracking-widest bg-black/90 px-4 py-1 border border-current shadow-sm text-center whitespace-nowrap">
                         {node.name}
                       </div>
-                      <div className="text-xs text-center bg-black/90 text-white px-2 mt-1 rounded-full inline-block font-bold">
+                      <div className="text-xs text-center bg-black/90 text-white px-2 mt-1 rounded-full inline-block font-bold border border-zinc-800">
                           {node.captureRate} kg/min
                       </div>
                     </div>
                   </div>
-                </div>
-              </Link>
+              </div>
             ))}
           </TransformComponent>
         </TransformWrapper>
       </div>
 
-      {/* FAB (Hidden for Spectator) */}
+      {/* FAB (Hidden for Spectator) - REPOSITIONED TO BOTTOM CENTER */}
       {!isSpectator && (
-        <div className="absolute bottom-24 right-6 z-30">
+        <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30">
           <button
             onClick={() => setIsScanning(true)}
             className="group relative w-20 h-20 rounded-full bg-cyan-600/30 text-cyan-300 border-2 border-cyan-400 flex items-center justify-center overflow-hidden transition-all hover:scale-105 active:scale-95 hover:bg-cyan-500 hover:text-black backdrop-blur-xl shadow-lg shadow-cyan-900/50"

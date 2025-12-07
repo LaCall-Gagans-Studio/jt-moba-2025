@@ -8,10 +8,10 @@ datasource db {
 }
 
 model Team {
-  id        String   @id @default(uuid())
-  name      String   @unique // Alpha, Bravo, Charlie, Delta
-  color     String // Hex Code
-  score     Int      @default(0)
+  id        String     @id @default(uuid())
+  name      String     @unique
+  color     String
+  score     Int        @default(0)
   nodes     Node[]
   auditLogs AuditLog[]
 }
@@ -19,13 +19,15 @@ model Team {
 model Node {
   id              String   @id @default(uuid())
   name            String
-  x               Float // 0-100%
-  y               Float // 0-100%
-  type            String // MEAT, VEGETABLE, AMMO
+  x               Float
+  y               Float
+  type            String
   controlledById  String?
   controlledBy    Team?    @relation(fields: [controlledById], references: [id])
   lastHarvestedAt DateTime @default(now())
-  captureRate     Int      @default(10) // Resource amount per minute
+  captureRate     Int      @default(10)
+  // ここが追加された重要な項目です
+  secretKey       String   @default(uuid()) 
 }
 
 model AuditLog {

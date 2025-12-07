@@ -8,6 +8,7 @@ type Node = {
   id: string
   name: string
   type: string
+  secretKey: string
 }
 
 export default function QRPrintPage() {
@@ -58,12 +59,12 @@ export default function QRPrintPage() {
 
                     {/* QR Code */}
                     <div className="bg-white p-2">
-                        <QRCode
-                            value={node.id}
-                            size={180}
-                            viewBox={`0 0 256 256`}
-                            level="H"
-                        />
+    <QRCode
+        value={JSON.stringify({ id: node.id, secret: node.secretKey })}
+        size={180}
+        viewBox={`0 0 256 256`}
+        level="H"
+    />
                     </div>
 
                     {/* Footer ID */}

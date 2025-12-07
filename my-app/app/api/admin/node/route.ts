@@ -11,7 +11,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { name, type, x, y } = body
+    const { name, type, x, y, captureRate } = body
 
     if (!name || x === undefined || y === undefined) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
         type: type || 'AMMO',
         x,
         y,
-        captureRate: 10, // Default
+        captureRate: Number(captureRate) || 10,
       },
     })
 
