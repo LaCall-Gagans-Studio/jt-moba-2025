@@ -10,8 +10,10 @@
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.2.4",
+    "@yudiel/react-qr-scanner": "^2.4.1",
     "class-variance-authority": "^0.7.1",
     "date-fns": "^4.1.0",
+    "framer-motion": "^12.23.25",
     "lucide-react": "^0.556.0",
     "next": "16.0.7",
     "pusher": "^5.2.0",
@@ -27,6 +29,7 @@
     "@types/node": "^20.19.25",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/react-qr-reader": "^2.1.7",
     "eslint": "^9",
     "eslint-config-next": "16.0.7",
     "prisma": "^5.22.0",

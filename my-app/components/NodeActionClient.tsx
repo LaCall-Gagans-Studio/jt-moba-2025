@@ -5,11 +5,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { Scan, Shield, Zap } from 'lucide-react'
+import QRScanner from './QRScanner'
 
 export default function NodeActionClient({ node, teams }: { node: any, teams: any[] }) {
   const [selectedTeam, setSelectedTeam] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
+  const [isScanning, setIsScanning] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -23,6 +26,20 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
     localStorage.setItem('my-team', teamName)
   }
 
+  const onScanCode = async (scannedData: string) => {
+    // Basic validation
+    if (!scannedData) return
+
+    // Verify if the scanned code matches the current node (security/validation)
+    if (scannedData !== node.id) {
+      toast.error('INVALID TARGET: Location mismatch.')
+      return
+    }
+
+    setIsScanning(false)
+    await handleAction()
+  }
+
   const handleAction = async () => {
     if (!selectedTeam) {
       toast.error('Please select a team first!')
@@ -33,7 +50,7 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
       const res = await fetch('/api/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId: node.id, teamName: selectedTeam })
+        body: JSON.stringify({ nodeId: node.id, teamName: selectedTeam }) // We rely on node.id since we verified it via scan
       })
       const data = await res.json()
       
@@ -43,9 +60,7 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
         if (data.success) {
           toast.success(data.message)
           setResult(data)
-          // Refresh page data? Or just rely on local state?
-          // For now, let's just show the result.
-           router.refresh()
+          router.refresh()
         } else {
            toast.info(data.message)
         }
@@ -84,15 +99,19 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
     )
   }
 
-  const isEnemy = node.controlledBy?.id && node.controlledBy?.name !== selectedTeam
-  const isNeutral = !node.controlledBy
-  const isFriendly = node.controlledBy?.name === selectedTeam
-
   return (
     <div className="flex flex-col items-center gap-6 w-full max-w-md">
+      {/* Scanner Modal */}
+      {isScanning && (
+        <QRScanner 
+          onScan={onScanCode} 
+          onClose={() => setIsScanning(false)} 
+        />
+      )}
+
       {/* Header */}
       <div className="text-center">
-        <div className="text-sm text-zinc-500 mb-1">CURRENT LOCATION</div>
+        <div className="text-sm text-zinc-500 mb-1">TARGET LOCKED</div>
         <h1 className="text-4xl font-black text-white uppercase tracking-tighter">{node.name}</h1>
         <div className="mt-2 inline-block px-3 py-1 rounded border border-zinc-700 bg-zinc-800 text-xs text-zinc-300">
            TYPE: <span className="text-neon-green">{node.type}</span>
@@ -106,7 +125,8 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
            <div className="flex flex-col items-center">
              <span className="text-xs uppercase tracking-widest text-zinc-500 mb-2">CONTROLLED BY</span>
              {node.controlledBy ? (
-               <span className="text-3xl font-bold" style={{ color: node.controlledBy.color }}>
+               <span className="text-3xl font-bold flex items-center gap-2" style={{ color: node.controlledBy.color }}>
+                 <Shield className="w-6 h-6" />
                  {node.controlledBy.name}
                </span>
              ) : (
@@ -120,33 +140,26 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
       <div className="w-full">
          <Button 
            disabled={loading}
-           onClick={handleAction}
-           className="w-full h-24 text-2xl font-black tracking-widest cyber-glitch relative overflow-hidden group"
-           style={{
-             borderColor: isFriendly ? '#00ff00' : '#ff0000',
-             color: isFriendly ? '#00ff00' : '#ff0000',
-             background: 'transparent'
-           }}
+           onClick={() => setIsScanning(true)}
+           className="w-full h-32 text-2xl font-black tracking-widest cyber-glitch relative overflow-hidden group bg-transparent border-2 border-cyan-500 text-cyan-500 hover:bg-cyan-500/10 hover:text-cyan-400 transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)]"
          >
-           <span className="absolute inset-0 bg-current opacity-10 group-hover:opacity-20 transition-opacity"></span>
-           <span className="relative z-10 flex flex-col items-center">
-             {loading ? 'PROCESSING...' : (
-               <>
-                 {isFriendly && 'HARVEST RESOURCES'}
-                 {(isEnemy || isNeutral) && 'CAPTURE NODE'}
-               </>
-             )}
-             <span className="text-xs font-normal mt-1 opacity-70">
-                {isFriendly && `Rate: ${node.captureRate}/min`}
-                {(isEnemy || isNeutral) && 'Taking control...'}
-             </span>
+           <span className="relative z-10 flex flex-col items-center gap-3">
+             <Scan className="w-10 h-10 animate-pulse" />
+             {loading ? 'PROCESSING...' : 'ACTIVATE SCANNER'}
            </span>
          </Button>
+         <p className="text-center text-xs text-zinc-500 mt-3 font-mono">
+            SCAN NODE QR CODE TO INTERACT
+         </p>
       </div>
 
       {/* Result Display */}
       {result && (
-        <div className="mt-4 p-4 w-full bg-zinc-800 border-l-4 border-white text-sm">
+        <div className="mt-4 p-4 w-full bg-zinc-800 border-l-4 border-white text-sm animate-in fade-in slide-in-from-bottom-4">
+          <div className="font-bold mb-1 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-yellow-400" />
+            SYSTEM RESPONSE:
+          </div>
           {result.message}
         </div>
       )}
