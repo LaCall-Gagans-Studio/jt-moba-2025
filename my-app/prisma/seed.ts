@@ -7,16 +7,16 @@ async function main() {
 
   // Teams
   const teams = [
-    { name: 'アルファ', color: '#ff0000' }, // Red
-    { name: 'ベータ', color: '#0000ff' }, // Blue
-    { name: 'ガンマ', color: '#00ff00' }, // Green
-    { name: 'デルタ', color: '#ffff00' }, // Yellow
+    { name: 'アルファ', color: '#ef4444' }, // Red-500
+    { name: 'ベータ', color: '#3b82f6' }, // Blue-500
+    { name: 'ガンマ', color: '#22c55e' }, // Green-500
+    { name: 'デルタ', color: '#eab308' }, // Yellow-500
   ]
 
   for (const t of teams) {
     await prisma.team.upsert({
       where: { name: t.name },
-      update: {},
+      update: { color: t.color },
       create: {
         name: t.name,
         color: t.color,
@@ -24,26 +24,45 @@ async function main() {
       },
     })
   }
-  const allTeams = await prisma.team.findMany()
-  console.log(`Teams created: ${allTeams.length}`)
 
-  // Nodes (Random positions)
-  // Clear existing nodes if needed? No, let's just create if not compatible or simple check
-  // For simplicity, we delete all nodes in dev to re-seed clean
+  // Nodes (IDs are fixed UUIDs for QR printing safety)
   await prisma.node.deleteMany()
 
   const initialNodes = [
-    { name: 'セントラル・キッチン', type: 'SPICE', x: 50, y: 50, captureRate: 100 },
-    { name: '第1精肉プラント', type: 'MEAT', x: 50, y: 15, captureRate: 50 },
-    { name: '第2精肉プラント', type: 'MEAT', x: 20, y: 80, captureRate: 50 },
-    { name: '水耕栽培ドームA', type: 'VEGETABLE', x: 80, y: 20, captureRate: 40 },
-    { name: '水耕栽培ドームB', type: 'VEGETABLE', x: 15, y: 50, captureRate: 40 },
-    { name: '浄水セクター', type: 'WATER', x: 85, y: 85, captureRate: 30 },
+    // SPICE
+    { 
+      id: '11111111-1111-1111-1111-111111111111', 
+      name: 'セントラル・キッチン', type: 'SPICE', x: 50, y: 50, captureRate: 100 
+    },
+    // MEAT
+    { 
+      id: '22222222-2222-2222-2222-222222222222',
+      name: '第1精肉プラント', type: 'MEAT', x: 50, y: 15, captureRate: 50 
+    },
+    { 
+      id: '33333333-3333-3333-3333-333333333333',
+      name: '第2精肉プラント', type: 'MEAT', x: 20, y: 80, captureRate: 50 
+    },
+    // VEGETABLE
+    { 
+      id: '44444444-4444-4444-4444-444444444444',
+      name: '水耕栽培ドームA', type: 'VEGETABLE', x: 80, y: 20, captureRate: 40 
+    },
+    { 
+      id: '55555555-5555-5555-5555-555555555555',
+      name: '水耕栽培ドームB', type: 'VEGETABLE', x: 15, y: 50, captureRate: 40 
+    },
+    // WATER
+    { 
+      id: '66666666-6666-6666-6666-666666666666',
+      name: '浄水セクター', type: 'WATER', x: 85, y: 85, captureRate: 30 
+    },
   ]
 
   for (const n of initialNodes) {
     await prisma.node.create({
       data: {
+        id: n.id, // ここでIDを指定！
         name: n.name,
         type: n.type,
         x: n.x,
@@ -54,7 +73,7 @@ async function main() {
     })
   }
 
-  console.log('Nodes seeded')
+  console.log('Nodes seeded with FIXED IDs')
 }
 
 main()
