@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --color-neon-green: #00ff00;
+  --color-neon-blue: #0088ff;
+  --color-neon-red: #ff0044;
+  --color-dark-bg: #050505;
+  --color-panel-bg: rgba(20, 20, 20, 0.8);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-dark-bg);
+    color: white;
+    font-family: 'Inter', sans-serif; /* Setup font later or rely on tailwind defaults */
+    overflow: hidden; /* For map vibe */
+  }
+}
+
+@layer components {
+  .cyber-panel {
+    background: var(--color-panel-bg);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+  }
+  
+  .game-btn {
+    @apply uppercase tracking-widest font-bold py-3 px-6 transition-all duration-200;
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+    background: linear-gradient(45deg, var(--color-neon-blue), transparent);
+    border: 1px solid var(--color-neon-blue);
+    color: var(--color-neon-blue);
+  }
+  
+  .game-btn:hover {
+    background: var(--color-neon-blue);
+    color: black;
+    box-shadow: 0 0 15px var(--color-neon-blue);
+  }
+
+  .clip-path-polygon {
+    clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  }
+}

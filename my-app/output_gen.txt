@@ -1,0 +1,1 @@
+Failed to parse syntax of config file at "C:\Users\Tohma\Dev\jt-moba-2025\my-app\prisma.config.ts"
