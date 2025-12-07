@@ -4,11 +4,11 @@ import { useEffect, useState, useRef } from 'react'
 import { pusherClient } from '@/lib/pusher'
 import { format } from 'date-fns'
 import Link from 'next/link'
-import { Radio, Target } from 'lucide-react'
+import { Radio, Target, Eye } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import QRScanner from './QRScanner'
-import { motion } from 'framer-motion'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 
 // Define types locally since Prisma client might not be generated yet in dev environment
 type Team = {
@@ -54,27 +54,42 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // Map Constraint Ref
-  const constraintsRef = useRef(null)
+  const isSpectator = searchParams.get('mode') === 'spectator'
 
   // Auto-Login via URL
   useEffect(() => {
+    if (isSpectator) return
+
     const teamParam = searchParams.get('team')
     if (teamParam) {
       // Validate if team exists
       const targetTeam = initialTeams.find(t => t.name === teamParam)
       if (targetTeam) {
         localStorage.setItem('my-team', teamParam)
-        if (myTeam !== teamParam) setMyTeam(teamParam)
-        toast.success(`所属確認: ${teamParam}小隊`, { position: 'top-center' })
+        
+        // State更新のループを防ぐため、現在の値と比較してから更新
+        setMyTeam(prev => {
+            if (prev !== teamParam) {
+                toast.success(`所属確認: ${teamParam}小隊`, { position: 'top-center' })
+                return teamParam
+            }
+            return prev
+        })
       } else {
-        toast.error('無効なチーム指定です')
+        // ここでのエラー表示は初回レンダリングで重複する可能性があるため控えめにするか、
+        // 必要ならフラグ管理を行いますが、一旦コメントアウトまたは単純化します
+        // toast.error('無効なチーム指定です')
       }
     } else {
       const stored = localStorage.getItem('my-team')
-      if (stored && myTeam !== stored) setMyTeam(stored)
+      if (stored) {
+        setMyTeam(prev => prev !== stored ? stored : prev)
+      }
     }
-  }, [searchParams, initialTeams, myTeam])
+    // myTeam を依存配列から除外します（これがエラーの原因です）
+    // 私たちは「URLが変わった時」に反応したいのであって、「myTeamが変わった時」に反応したいわけではありません
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, initialTeams, isSpectator])
 
   const onGlobalScan = (data: string) => {
     if (data) {
@@ -119,20 +134,20 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
 
   // Helper to get team color
   const getTeamColor = (teamId: string | null) => {
-    if (!teamId) return '#333333' // Darker neutral
+    if (!teamId) return '#aaaaaa' // Lighter neutral for visibility
     const team = teams.find(t => t.id === teamId)
-    return team ? team.color : '#333333'
+    return team ? team.color : '#aaaaaa'
   }
 
   // Define icon based on type
   const getTypeIcon = (type: string) => {
-     switch(type) {
-       case 'MEAT': return '🥩'
-       case 'VEGETABLE': return '🥬'
-       case 'SPICE': return '🌶️'
-       case 'WATER': return '💧'
-       default: return '📦'
-     }
+      switch(type) {
+        case 'MEAT': return '🥩'
+        case 'VEGETABLE': return '🥬'
+        case 'SPICE': return '🌶️'
+        case 'WATER': return '💧'
+        default: return '📦'
+      }
   }
 
   return (
@@ -140,26 +155,35 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
       
       {/* Screen Overlays (Fixed) */}
       <div className="absolute inset-0 pointer-events-none z-20">
-         {/* Vignette */}
-         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.8)_100%)]"></div>
-         {/* Scanlines */}
-         <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-1 bg-size-[100%_2px,3px_100%] pointer-events-none"></div>
+          {/* Vignette */}
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.8)_100%)]"></div>
+          {/* Scanlines */}
+          <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-1 bg-size-[100%_2px,3px_100%] pointer-events-none opacity-50"></div>
       </div>
       
       {/* HUD Elements (Fixed z-30) */}
-      <div className="absolute top-0 left-0 w-full z-30 pt-4 px-4 pb-12 bg-linear-to-b from-black via-black/80 to-transparent flex flex-wrap gap-2 justify-between items-start pointer-events-none">
+      <div className="absolute top-0 left-0 w-full z-30 pt-safe-top px-4 pb-4 bg-linear-to-b from-black/90 via-black/80 to-transparent flex flex-wrap gap-2 justify-between items-start pointer-events-none backdrop-blur-sm">
+        
         {/* Team Status Card (Top Left) */}
-        {myTeam ? (
-           <div className="flex items-center gap-3 backdrop-blur-sm bg-black/40 border-l-4 border-cyan-500 pl-3 pr-4 py-2 clip-path-polygon">
+        {isSpectator ? (
+           <div className="flex items-center gap-3 bg-zinc-900/80 border-l-4 border-zinc-500 pl-3 pr-4 py-2 clip-path-polygon shadow-lg">
+              <Eye className="w-5 h-5 text-zinc-400" />
+              <div>
+                 <div className="text-[10px] text-zinc-400 leading-none mb-1 tracking-widest">MODE</div>
+                 <div className="text-lg font-bold leading-none text-zinc-200">SPECTATOR</div>
+              </div>
+           </div>
+        ) : myTeam ? (
+           <div className="flex items-center gap-3 bg-zinc-900/80 border-l-4 border-cyan-500 pl-3 pr-4 py-2 clip-path-polygon shadow-lg">
               <Radio className="w-4 h-4 text-cyan-500 animate-pulse" />
               <div>
-                 <div className="text-[10px] text-cyan-500 leading-none mb-1">CURRENT UNIT</div>
-                 <div className="text-lg font-bold leading-none">{myTeam}</div>
+                 <div className="text-[10px] text-cyan-400 leading-none mb-1 tracking-widest">CURRENT UNIT</div>
+                 <div className="text-lg font-bold leading-none text-white">{myTeam}</div>
               </div>
            </div>
         ) : (
-           <div className="flex items-center gap-3 backdrop-blur-sm bg-black/40 border-l-4 border-red-500 pl-3 pr-4 py-2">
-              <div className="text-red-500 font-bold animate-pulse">UNIT UNIDENTIFIED</div>
+           <div className="flex items-center gap-3 bg-zinc-900/80 border-l-4 border-red-500 pl-3 pr-4 py-2 shadow-lg">
+              <div className="text-red-500 font-bold animate-pulse tracking-widest">UNIT UNIDENTIFIED</div>
            </div>
         )}
 
@@ -168,12 +192,12 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
           {teams.map(team => (
             <div key={team.id} className="relative group">
                <div 
-                 className="px-3 py-1 min-w-[80px] text-right border-b-2 bg-black/50 backdrop-blur-md transition-all"
+                 className="px-2 py-1 min-w-[60px] md:min-w-[80px] text-right border-b-2 bg-black/70 backdrop-blur-md transition-all rounded-t-sm"
                  style={{ borderColor: team.color }}
                >
-                 <span className="block text-[10px] opacity-70 mb-0.5" style={{ color: team.color }}>{team.name}</span>
-                 <span className="block text-xl font-bold font-mono tracking-tighter" style={{ textShadow: `0 0 10px ${team.color}` }}>
-                   {team.score.toLocaleString()}<span className="text-[10px] ml-1 opacity-50">kcal</span>
+                 <span className="block text-[8px] md:text-[10px] opacity-80 mb-0.5 font-bold" style={{ color: team.color }}>{team.name}</span>
+                 <span className="block text-sm md:text-xl font-bold font-mono tracking-tighter text-white" style={{ textShadow: `0 0 10px ${team.color}99` }}>
+                   {team.score.toLocaleString()}
                  </span>
                </div>
             </div>
@@ -181,83 +205,97 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
         </div>
       </div>
 
-      {/* Constraints Container for Dragging - effectively the 'edges' of where we can drag */}
-      {/* Actually, if we want infinite-like scroll we don't need constraints, but let's try to center start */}
-      
-      {/* Draggable Map Area */}
-      <motion.div 
-        className="absolute top-0 left-0 z-10 bg-zinc-900 cursor-move"
-        // 300% size, centered initially (-100%, -100%)
-        initial={{ x: '-100vw', y: '-100vh' }}
-        style={{ width: '300vw', height: '300vh' }}
-        drag
-        dragElastic={0.2} 
-        dragMomentum={true}
-      >
-        {/* Map Grid Pattern (Moves with map) */}
-        <div className="absolute inset-0 opacity-20" 
-             style={{ 
-               backgroundImage: 'linear-gradient(#00ff00 1px, transparent 1px), linear-gradient(90deg, #00ff00 1px, transparent 1px)', 
-               backgroundSize: '100px 100px' 
-             }}>
-        </div>
-        
-        {/* Nodes */}
-        {nodes.map(node => (
-          <Link href={`/node/${node.id}`} key={node.id}>
-             {/* 
-                We place nodes on the 300% map.
-                If coordinates are 0-100%, they will span the whole 300% area.
-                Wait, if node.x is 50, it means 50% of 300vw, which is 150vw. perfect center.
-             */}
-             <div 
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 cursor-pointer group"
-              style={{ left: `${node.x}%`, top: `${node.y}%` }}
-            >
-              <div className="relative flex flex-col items-center">
-                 {/* Pin Icon */}
-                 <div 
-                   className="w-16 h-16 clip-path-hexagon flex items-center justify-center bg-black/90 shadow-[0_0_15px_currentColor] transition-all duration-300 group-hover:scale-110 group-hover:bg-zinc-800 border-2"
-                   style={{ borderColor: getTeamColor(node.controlledById), color: getTeamColor(node.controlledById), boxShadow: `0 0 30px ${getTeamColor(node.controlledById)}66` }}
-                 >
-                    <span className="text-3xl filter drop-shadow-md">{getTypeIcon(node.type)}</span>
-                 </div>
-                 
-                 {/* Connection Line */}
-                 <div className={`h-12 w-1 bg-current opacity-50 absolute top-full left-1/2 -translate-x-1/2 -z-10`} style={{ color: getTeamColor(node.controlledById) }}></div>
-                 
-                 {/* Label */}
-                 <div className="mt-4" style={{ color: getTeamColor(node.controlledById) }}>
-                   <div className="text-xs font-bold uppercase tracking-widest bg-black/80 px-3 py-1 border border-current shadow-lg backdrop-blur-md">
-                     {node.name}
-                   </div>
-                   <div className="text-[10px] text-center bg-black/90 text-white px-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      Rate: {node.captureRate}kg/min
-                   </div>
-                 </div>
-              </div>
-            </div>
-          </Link>
-        ))}
-      </motion.div>
-
-      {/* FAB (Fixed z-30) */}
-      <div className="absolute bottom-8 right-8 z-30">
-        <button
-          onClick={() => setIsScanning(true)}
-          className="group relative w-20 h-20 rounded-full bg-cyan-600/20 text-cyan-400 border border-cyan-500/50 flex items-center justify-center overflow-hidden transition-all hover:scale-105 active:scale-95 hover:bg-cyan-500 hover:text-black backdrop-blur-md"
+      {/* Main Map Area with Zoom/Pan */}
+      <div className="absolute inset-0 z-10 w-full h-full bg-zinc-900">
+        <TransformWrapper
+          initialScale={0.5}
+          minScale={0.2}
+          maxScale={3}
+          centerOnInit={true}
+          limitToBounds={false}
+          smooth={true}
+          wheel={{ step: 0.1 }}
         >
-          {/* Radar Sweep Effect */}
-          <div className="absolute inset-0 bg-linear-to-tr from-transparent via-cyan-500/20 to-transparent animate-spin-slow opacity-0 group-hover:opacity-100" />
-          <Target className="w-10 h-10 relative z-10" />
-          <div className="absolute -bottom-8 right-full w-40 text-right mr-6 text-sm text-cyan-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-             広域スキャン開始 &gt;&gt;
-          </div>
-        </button>
+          <TransformComponent
+            wrapperClass="!w-full !h-full"
+            contentClass="!w-[2000px] !h-[2000px] relative" // Large fixed size map
+          >
+            {/* Map Grid Pattern */}
+            <div className="absolute inset-0 bg-zinc-900" 
+                style={{ 
+                  width: '2000px',
+                  height: '2000px',
+                  backgroundImage: 'linear-gradient(#222 2px, transparent 2px), linear-gradient(90deg, #222 2px, transparent 2px)', 
+                  backgroundSize: '100px 100px' 
+                }}>
+                  {/* Glowing Grid overlay */}
+                  <div className="absolute inset-0 opacity-10 pointer-events-none"
+                    style={{
+                      backgroundImage: 'linear-gradient(#00ff00 1px, transparent 1px), linear-gradient(90deg, #00ff00 1px, transparent 1px)',
+                      backgroundSize: '100px 100px'
+                    }}
+                  />
+            </div>
+
+            {/* Nodes */}
+            {nodes.map(node => (
+              <Link href={isSpectator ? '#' : `/node/${node.id}`} key={node.id} onClick={(e) => isSpectator && e.preventDefault()}>
+                <div 
+                  className={`absolute transform -translate-x-1/2 -translate-y-1/2 group ${isSpectator ? 'cursor-default' : 'cursor-pointer'}`}
+                  style={{ left: `${node.x}%`, top: `${node.y}%` }}
+                >
+                  <div className="relative flex flex-col items-center">
+                    {/* Pin Icon */}
+                    <div 
+                      className="w-24 h-24 clip-path-hexagon flex items-center justify-center bg-black/80 shadow-[0_0_15px_currentColor] transition-all duration-300 group-hover:scale-110 group-hover:bg-zinc-800 border-4"
+                      style={{ 
+                        borderColor: getTeamColor(node.controlledById), 
+                        color: getTeamColor(node.controlledById), 
+                        boxShadow: `0 0 40px ${getTeamColor(node.controlledById)}66` 
+                      }}
+                    >
+                        <span className="text-5xl filter drop-shadow-md">{getTypeIcon(node.type)}</span>
+                    </div>
+                    
+                    {/* Connection Line & Base */}
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] border border-current rounded-full opacity-10 animate-pulse pointer-events-none" style={{ color: getTeamColor(node.controlledById) }}></div>
+
+                    {/* Label */}
+                    <div className="mt-4" style={{ color: getTeamColor(node.controlledById) }}>
+                      <div className="text-base font-black uppercase tracking-widest bg-black/80 px-4 py-1 border border-current shadow-lg backdrop-blur-md text-center whitespace-nowrap">
+                        {node.name}
+                      </div>
+                      <div className="text-xs text-center bg-black/90 text-white px-2 mt-1 rounded-full inline-block font-bold">
+                          {node.captureRate} kg/min
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </TransformComponent>
+        </TransformWrapper>
       </div>
 
+      {/* FAB (Hidden for Spectator) */}
+      {!isSpectator && (
+        <div className="absolute bottom-24 right-6 z-30">
+          <button
+            onClick={() => setIsScanning(true)}
+            className="group relative w-20 h-20 rounded-full bg-cyan-600/30 text-cyan-300 border-2 border-cyan-400 flex items-center justify-center overflow-hidden transition-all hover:scale-105 active:scale-95 hover:bg-cyan-500 hover:text-black backdrop-blur-xl shadow-lg shadow-cyan-900/50"
+          >
+            {/* Radar Sweep Effect */}
+            <div className="absolute inset-0 bg-linear-to-tr from-transparent via-cyan-400/30 to-transparent animate-spin-slow opacity-0 group-hover:opacity-100" />
+            <Target className="w-10 h-10 relative z-10" />
+            <div className="absolute -bottom-8 right-full w-40 text-right mr-6 text-sm text-cyan-300 font-black opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none bg-black/80 px-2 rounded">
+               広域スキャン開始 &gt;&gt;
+            </div>
+          </button>
+        </div>
+      )}
+
       {/* Global Scanner Overlay */}
-      {isScanning && (
+      {isScanning && !isSpectator && (
         <QRScanner 
           onScan={onGlobalScan}
           onClose={() => setIsScanning(false)}
@@ -265,18 +303,22 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
       )}
 
       {/* HUD: Bottom Log (Fixed z-30) */}
-      <div className="absolute bottom-0 left-0 w-full md:w-1/2 h-1/3 bg-linear-to-t from-black via-black/80 to-transparent p-4 flex flex-col justify-end pointer-events-none z-30">
-        <div className="flex items-center gap-2 mb-2 opacity-50">
+      <div className="absolute bottom-0 left-0 w-full md:w-1/2 h-1/3 bg-linear-to-t from-black via-black/80 to-transparent p-4 pb-8 flex flex-col justify-end pointer-events-none z-20">
+        <div className="flex items-center gap-2 mb-2 opacity-80 pl-4 border-l-2 border-green-500">
            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-           <span className="text-[10px] text-green-500 tracking-widest">SYSTEM LOG // ENCRYPTED</span>
+           <span className="text-[10px] text-green-400 tracking-widest font-bold">SYSTEM LOG // ENCRYPTED</span>
         </div>
-        <div className="flex flex-col-reverse h-full overflow-hidden mask-image-gradient border-l border-zinc-800 pl-4">
+        <div className="flex flex-col-reverse h-full overflow-hidden mask-image-gradient border-l border-zinc-700/50 pl-4 bg-black/20 backdrop-blur-sm rounded-r-lg">
            {logs.map((log) => (
-             <div key={log.id} className="mb-1.5 text-xs font-mono flex items-start animate-in slide-in-from-left-5">
-               <span className="text-zinc-600 mr-3 shrink-0">
+             <div key={log.id} className="mb-2 text-xs font-mono flex items-start animate-in slide-in-from-left-5">
+               <span className="text-zinc-400 mr-3 shrink-0 font-bold">
                  [{format(new Date(log.createdAt), 'HH:mm:ss')}]
                </span>
-               <span style={{ color: log.teamColor || '#aaa', textShadow: log.teamColor ? `0 0 5px ${log.teamColor}66` : 'none' }}>
+               <span style={{ 
+                 color: log.teamColor || '#ddd', 
+                 textShadow: log.teamColor ? `0 0 10px ${log.teamColor}aa` : 'none',
+                 fontWeight: 'bold' 
+               }}>
                  {log.message}
                </span>
              </div>
