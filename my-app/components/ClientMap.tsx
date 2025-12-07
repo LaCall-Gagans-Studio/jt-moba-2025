@@ -220,16 +220,20 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
             wrapperClass="!w-full !h-full"
             contentClass="!w-[2000px] !h-[2000px] relative" // Large fixed size map
           >
-            {/* Map Grid Pattern */}
+            {/* Map Image Background */}
             <div className="absolute inset-0 bg-zinc-900" 
                 style={{ 
                   width: '2000px',
                   height: '2000px',
-                  backgroundImage: 'linear-gradient(#222 2px, transparent 2px), linear-gradient(90deg, #222 2px, transparent 2px)', 
-                  backgroundSize: '100px 100px' 
                 }}>
-                  {/* Glowing Grid overlay */}
-                  <div className="absolute inset-0 opacity-10 pointer-events-none"
+                  <img 
+                    src="/map.jpg" 
+                    alt="Tactical Map" 
+                    className="w-full h-full object-cover opacity-80"
+                    draggable={false}
+                  />
+                  {/* Optional Grid Overlay on top of image for effect */}
+                  <div className="absolute inset-0 opacity-30 pointer-events-none mix-blend-overlay"
                     style={{
                       backgroundImage: 'linear-gradient(#00ff00 1px, transparent 1px), linear-gradient(90deg, #00ff00 1px, transparent 1px)',
                       backgroundSize: '100px 100px'

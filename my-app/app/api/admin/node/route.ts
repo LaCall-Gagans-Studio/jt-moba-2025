@@ -3,6 +3,11 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+export async function GET() {
+  const nodes = await prisma.node.findMany({ orderBy: { name: 'asc' } })
+  return NextResponse.json(nodes)
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
