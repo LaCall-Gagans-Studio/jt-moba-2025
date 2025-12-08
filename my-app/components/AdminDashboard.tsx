@@ -153,13 +153,14 @@ export default function AdminDashboard() {
 
   // ゲーム進行操作系
   const handleGameControl = async (action: "START" | "RESET") => {
-    if (
-      action === "RESET" &&
-      !confirm(
-        "警告: 全チームのスコア、資源、ログが完全に消去されます。\n本当によろしいですか？"
-      )
-    )
-      return;
+    // アクションに応じたメッセージを設定
+    const message =
+      action === "START"
+        ? "ゲームを開始しますか？"
+        : "警告: 全チームのスコア、資源、ログが完全に消去されます。\n本当によろしいですか？";
+
+    // 確認ダイアログを表示（キャンセルされたら処理を中断）
+    if (!confirm(message)) return;
 
     setLoading(true);
     try {
@@ -177,7 +178,7 @@ export default function AdminDashboard() {
   };
 
   const handleForceTick = async () => {
-    if (!confirm("1分経過させますか？（資源が加算されます）")) return;
+    if (!confirm("3分経過させますか？（資源が加算されます）")) return;
     try {
       await fetch("/api/game/tick", { method: "POST" });
       toast.success("Tick処理完了");

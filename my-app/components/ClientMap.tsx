@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { pusherClient } from "@/lib/pusher";
 import { format } from "date-fns";
 import { Radio, Target, Eye } from "lucide-react";
@@ -10,7 +10,7 @@ import QRScanner from "./QRScanner";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import LoadingOverlay from "./ui/LoadingOverlay";
 
-// Define types locally since Prisma client might not be generated yet in dev environment
+// --- Types ---
 type Team = {
   id: string;
   name: string;
@@ -21,12 +21,12 @@ type Team = {
 type Node = {
   id: string;
   name: string;
-  x: number; // 0-100%
-  y: number; // 0-100%
+  x: number;
+  y: number;
   type: string;
   controlledById: string | null;
   controlledBy?: Team | null;
-  captureRate: number; // per min
+  captureRate: number;
 };
 
 type AuditLog = {
@@ -39,11 +39,155 @@ type AuditLog = {
 };
 
 interface ClientMapProps {
-  initialNodes: any[]; // relaxed type
+  initialNodes: any[];
   initialTeams: any[];
   initialLogs: any[];
 }
 
+// --- Icons Helper ---
+const getTypeIcon = (type: string) => {
+  switch (type) {
+    case "MEAT":
+      return "🍖";
+    case "VEGETABLE":
+      return "🥬";
+    case "RICE":
+      return "🍚";
+    case "NOODLE":
+      return "🍜";
+    case "BREAD":
+      return "🥖";
+    case "SEAFOOD":
+      return "🦐";
+    case "SPICE":
+      return "🌶️";
+    case "DAIRY":
+      return "🧀";
+    default:
+      return "📦";
+  }
+};
+
+// --- Colors Helper ---
+const getTeamColor = (teams: Team[], teamId: string | null) => {
+  if (!teamId) return "#aaaaaa";
+  const team = teams.find((t) => t.id === teamId);
+  return team ? team.color : "#aaaaaa";
+};
+
+// --- Optimized Map Content Component (Memoized) ---
+// このコンポーネントは nodes または teams が変わった時だけ再描画されます。
+// ログの更新や他のState変更では再描画されません。
+const MapContent = React.memo(
+  ({
+    nodes,
+    teams,
+    isSpectator,
+    onNodeClick,
+  }: {
+    nodes: Node[];
+    teams: Team[];
+    isSpectator: boolean;
+    onNodeClick: (e: React.MouseEvent, node: Node) => void;
+  }) => {
+    return (
+      <div className="relative w-full h-full">
+        <img
+          src="/map.jpg"
+          alt="Tactical Map"
+          className="w-full h-auto block opacity-80"
+          draggable={false}
+          loading="eager" // 高速化: 即時読み込み
+          decoding="async" // 高速化: 非同期デコード
+        />
+
+        {/* Grid Overlay */}
+        <div
+          className="absolute inset-0 opacity-20 pointer-events-none"
+          style={{
+            backgroundImage:
+              "linear-gradient(#00ff00 1px, transparent 1px), linear-gradient(90deg, #00ff00 1px, transparent 1px)",
+            backgroundSize: "100px 100px",
+          }}
+        />
+
+        {/* Territory Glow Layer - 軽量化版 */}
+        {nodes.map((node) => {
+          if (!node.controlledById) return null;
+          const color = getTeamColor(teams, node.controlledById);
+          return (
+            <div
+              key={`glow-${node.id}`}
+              className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+              style={{
+                left: `${node.x}%`,
+                top: `${node.y}%`,
+                width: "800px", // サイズ縮小 (2000px -> 800px)
+                height: "800px",
+                // 重い mix-blend-mode を削除し、単純な透明度合成に変更
+                background: `radial-gradient(circle closest-side, ${color} 0%, transparent 70%)`,
+                opacity: 0.3,
+                zIndex: 15,
+                willChange: "transform", // GPU最適化
+              }}
+            />
+          );
+        })}
+
+        {/* Nodes */}
+        {nodes.map((node) => {
+          const color = getTeamColor(teams, node.controlledById);
+          return (
+            <div
+              key={node.id}
+              onClick={(e) => onNodeClick(e, node)}
+              className={`absolute transform -translate-x-1/2 -translate-y-1/2 group z-20 ${
+                isSpectator ? "cursor-default" : "cursor-pointer"
+              }`}
+              style={{
+                left: `${node.x}%`,
+                top: `${node.y}%`,
+                willChange: "transform", // GPU最適化
+              }}
+            >
+              <div className="relative flex flex-col items-center">
+                {/* Pin Icon - 軽量化: 影などの装飾をCSSでシンプルに */}
+                <div
+                  className="w-24 h-24 clip-path-hexagon flex items-center justify-center bg-black/90 transition-transform duration-150 group-hover:scale-105 border-4"
+                  style={{
+                    borderColor: color,
+                    color: color,
+                  }}
+                >
+                  <span className="text-5xl">{getTypeIcon(node.type)}</span>
+                </div>
+
+                {/* Label */}
+                <div className="mt-4" style={{ color: color }}>
+                  <div className="text-base font-black uppercase tracking-widest bg-black/90 px-4 py-1 border border-current shadow-sm text-center whitespace-nowrap">
+                    {node.name}
+                  </div>
+                  <div className="text-xs text-center bg-black/90 text-white px-2 mt-1 rounded-full inline-block font-bold border border-zinc-800">
+                    {node.captureRate} kg/min
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  },
+  (prev, next) => {
+    // 高速化: nodes と teams が変更されたときのみ再描画
+    // （厳密な比較が必要なら JSON.stringify を使いますが、ここでは参照変更を検知させます）
+    return prev.nodes === next.nodes && prev.teams === next.teams;
+  }
+);
+
+MapContent.displayName = "MapContent";
+
+// --- Main Component ---
 export default function ClientMap({
   initialNodes,
   initialTeams,
@@ -67,74 +211,64 @@ export default function ClientMap({
 
     const teamParam = searchParams.get("team");
     if (teamParam) {
-      // Validate if team exists
       const targetTeam = initialTeams.find((t) => t.name === teamParam);
       if (targetTeam) {
         localStorage.setItem("my-team", teamParam);
 
-        // State更新のループを防ぐため、現在の値と比較してから更新
-        setMyTeam((prev) => {
-          if (prev !== teamParam) {
-            toast.success(`所属確認: ${teamParam}チーム`, {
-              position: "top-center",
-            });
-            return teamParam;
-          }
-          return prev;
-        });
-      } else {
-        // ここでのエラー表示は初回レンダリングで重複する可能性があるため控えめにするか、
-        // 必要ならフラグ管理を行いますが、一旦コメントアウトまたは単純化します
-        // toast.error('無効なチーム指定です')
+        // Defer state update to avoid synchronous setState warning
+        setTimeout(() => {
+          setMyTeam((prev) => {
+            if (prev !== teamParam) {
+              toast.success(`所属確認: ${teamParam}チーム`, {
+                position: "top-center",
+              });
+              return teamParam;
+            }
+            return prev;
+          });
+        }, 0);
       }
     } else {
       const stored = localStorage.getItem("my-team");
       if (stored) {
-        setMyTeam((prev) => (prev !== stored ? stored : prev));
+        setTimeout(() => {
+          setMyTeam((prev) => (prev !== stored ? stored : prev));
+        }, 0);
       }
     }
-    // myTeam を依存配列から除外します（これがエラーの原因です）
-    // 私たちは「URLが変わった時」に反応したいのであって、「myTeamが変わった時」に反応したいわけではありません
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, initialTeams, isSpectator]); // optimized deps // optimized deps
+  }, [searchParams, initialTeams, isSpectator]);
 
   const onGlobalScan = (data: string) => {
     if (data) {
       try {
-        // New JSON format { id, secret }
         const parsed = JSON.parse(data);
         if (parsed.id && parsed.secret) {
-          // Store secret credential
           sessionStorage.setItem(`node-secret-${parsed.id}`, parsed.secret);
-
           setIsScanning(false);
-          router.push(`/node/${parsed.id}`); // No verified param needed
+          router.push(`/node/${parsed.id}`);
           toast.success("セキュリティ認証成功: アクセス権限取得");
           return;
         }
       } catch {
-        // Fallback for old format or invalid data
         console.log("Legacy format or invalid JSON");
       }
-
-      // Old logic (should we keep it? User said "abolish URL param". But maybe good for fallback if needed. User was strict "completely prevent". So let's strict fail if not valid.)
       toast.error("無効なQRコードです");
     }
   };
 
-  // Keep teams in ref to access inside Pusher callbacks without re-subscribing
+  // Refs for Pusher callbacks
   const teamsRef = useRef(teams);
   useEffect(() => {
     teamsRef.current = teams;
   }, [teams]);
 
   useEffect(() => {
-    // Subscribe to Pusher
     const channel = pusherClient.subscribe("game-channel");
 
     channel.bind("map-update", (data: any) => {
-      setNodes((prev) =>
-        prev.map((n) =>
+      // Create a new array reference to trigger re-render correctly in Memo
+      setNodes((prev) => [
+        ...prev.map((n) =>
           n.id === data.nodeId
             ? {
                 ...n,
@@ -144,16 +278,16 @@ export default function ClientMap({
                   n.controlledBy,
               }
             : n
-        )
-      );
+        ),
+      ]);
     });
 
     channel.bind("score-update", (data: any) => {
-      setTeams((prev) =>
-        prev.map((t) =>
+      setTeams((prev) => [
+        ...prev.map((t) =>
           t.id === data.teamId ? { ...t, score: data.newScore } : t
-        )
-      );
+        ),
+      ]);
     });
 
     channel.bind("log-new", (data: any) => {
@@ -164,7 +298,7 @@ export default function ClientMap({
             id: data.id,
             message: data.message,
             createdAt: new Date(data.createdAt),
-            teamId: null, // simplified
+            teamId: null,
             teamColor: data.teamColor,
           },
           ...prev,
@@ -177,57 +311,37 @@ export default function ClientMap({
     };
   }, []);
 
-  // Helper to get team color
-  const getTeamColor = (teamId: string | null) => {
-    if (!teamId) return "#aaaaaa"; // Lighter neutral for visibility
-    const team = teams.find((t) => t.id === teamId);
-    return team ? team.color : "#aaaaaa";
-  };
-
-  // Define icon based on type
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "MEAT":
-        return "🍖";
-      case "VEGETABLE":
-        return "🥬";
-      case "RICE":
-        return "🍚";
-      case "NOODLE":
-        return "🍜";
-      case "BREAD":
-        return "🥖";
-      case "SEAFOOD":
-        return "🦐";
-      case "SPICE":
-        return "🌶️";
-      case "DAIRY":
-        return "🧀";
-      default:
-        return "📦";
-    }
-  };
+  // Node click handler (Memoized to prevent unnecessary re-renders)
+  const handleNodeClick = useCallback(
+    (e: React.MouseEvent, node: Node) => {
+      if (isSpectator) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setIsLoading(true);
+      setTimeout(() => {
+        router.push(`/node/${node.id}`);
+      }, 0);
+    },
+    [isSpectator, router]
+  );
 
   return (
     <div className="relative w-full h-screen text-white bg-zinc-950 overflow-hidden font-mono tracking-tight selection:bg-cyan-500/30">
       {isLoading && <LoadingOverlay />}
 
-      {/* Screen Overlays (Fixed) */}
+      {/* Screen Overlays */}
       <div className="absolute inset-0 pointer-events-none z-20">
-        {/* Vignette */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.8)_100%)]"></div>
-        {/* Scanlines */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-1 bg-size-[100%_2px,3px_100%] pointer-events-none opacity-50"></div>
       </div>
 
-      {/* HUD Elements (Fixed z-30) */}
-      {/* HUD Elements Block (Combined Header & Bar) */}
+      {/* HUD Elements (Combined Header & Bar) */}
       <div className="absolute top-0 left-0 w-full z-30 flex flex-col pointer-events-none">
-        {/* 1. Header Area (Status Card + Resource Ticker) */}
-        <div className="w-full pt-safe-top px-4 pb-4 bg-linear-to-b from-black/90 via-black/80 to-transparent flex flex-wrap gap-2 justify-between items-start backdrop-blur-sm">
-          {/* Team Status Card (Top Left) - 既存コード維持 */}
+        {/* Header: backdrop-blur削除 -> bg-black/90で代用（高速化） */}
+        <div className="w-full pt-safe-top px-4 pb-4 bg-gradient-to-b from-black via-black/90 to-transparent flex flex-wrap gap-2 justify-between items-start">
+          {/* Status Card */}
           {isSpectator ? (
-            <div className="flex items-center gap-3 bg-zinc-900/80 border-l-4 border-zinc-500 pl-3 pr-4 py-2 clip-path-polygon shadow-lg">
+            <div className="flex items-center gap-3 bg-zinc-900 border-l-4 border-zinc-500 pl-3 pr-4 py-2 clip-path-polygon shadow-lg">
               <Eye className="w-5 h-5 text-zinc-400" />
               <div>
                 <div className="text-[10px] text-zinc-400 leading-none mb-1 tracking-widest">
@@ -239,7 +353,7 @@ export default function ClientMap({
               </div>
             </div>
           ) : myTeam ? (
-            <div className="flex items-center gap-3 bg-zinc-900/80 border-l-4 border-cyan-500 pl-3 pr-4 py-2 clip-path-polygon shadow-lg">
+            <div className="flex items-center gap-3 bg-zinc-900 border-l-4 border-cyan-500 pl-3 pr-4 py-2 clip-path-polygon shadow-lg">
               <Radio className="w-4 h-4 text-cyan-500 animate-pulse" />
               <div>
                 <div className="text-[10px] text-cyan-400 leading-none mb-1 tracking-widest">
@@ -251,19 +365,20 @@ export default function ClientMap({
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-3 bg-zinc-900/80 border-l-4 border-red-500 pl-3 pr-4 py-2 shadow-lg">
+            <div className="flex items-center gap-3 bg-zinc-900 border-l-4 border-red-500 pl-3 pr-4 py-2 shadow-lg">
               <div className="text-red-500 font-bold animate-pulse tracking-widest">
                 UNIT UNIDENTIFIED
               </div>
             </div>
           )}
 
-          {/* Global Resource Ticker (Top Right) */}
+          {/* Resource Ticker */}
           <div className="flex gap-2">
             {teams.map((team) => (
               <div key={team.id} className="relative group">
+                {/* bg-black/90 に変更 */}
                 <div
-                  className="px-2 py-1 min-w-[60px] md:min-w-[80px] text-right border-b-2 bg-black/70 backdrop-blur-md transition-all rounded-t-sm"
+                  className="px-2 py-1 min-w-[60px] md:min-w-[80px] text-right border-b-2 bg-black/90 transition-all rounded-t-sm"
                   style={{ borderColor: team.color }}
                 >
                   <span
@@ -284,9 +399,8 @@ export default function ClientMap({
           </div>
         </div>
 
-        {/* 2. Territory Control Bar (Stacked Immediately Below) */}
-        {/* absolute などを削除し、親のflexの流れに従わせる */}
-        <div className="w-full h-2 flex bg-zinc-900/50 backdrop-blur-sm shadow-lg overflow-hidden border-y border-white/5 shrink-0">
+        {/* Territory Control Bar */}
+        <div className="w-full h-2 flex bg-zinc-900/90 shadow-lg overflow-hidden border-y border-white/5 shrink-0">
           {(() => {
             const totalNodes = nodes.length;
             if (totalNodes === 0) return null;
@@ -302,18 +416,16 @@ export default function ClientMap({
                   className="h-full transition-all duration-500 ease-in-out relative group"
                   style={{ width: `${width}%`, backgroundColor: team.color }}
                 >
-                  {/* Shimmer effect */}
-                  <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] animate-shimmer" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] animate-shimmer" />
                 </div>
               );
             });
           })()}
-          {/* Neutral Space */}
           <div className="flex-1 bg-zinc-800/30 h-full" />
         </div>
       </div>
 
-      {/* Main Map Area with Zoom/Pan */}
+      {/* Main Map Area */}
       <div className="absolute inset-0 z-10 w-full h-full bg-zinc-900">
         <TransformWrapper
           initialScale={0.5}
@@ -326,152 +438,51 @@ export default function ClientMap({
         >
           <TransformComponent
             wrapperClass="!w-full !h-full"
-            // 変更点1: 高さを固定せず h-auto に、幅だけ大きく確保する（例: 2000px）
-            // アスペクト比を維持させるため aspect-video (16:9) などを入れるか、単に h-auto にする
             contentClass="!w-[2000px] !h-auto relative"
           >
-            {/* Map Image Background */}
-            <div className="relative w-full h-full">
-              {/* 変更点2: 親divの固定サイズstyleを削除し、画像のサイズに合わせる */}
-
-              <img
-                src="/map.jpg"
-                alt="Tactical Map"
-                // 変更点3: object-cover を削除し、ブロック要素として自然に配置
-                className="w-full h-auto block opacity-80"
-                draggable={false}
-              />
-
-              {/* Grid Overlay */}
-              <div
-                className="absolute inset-0 opacity-20 pointer-events-none"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(#00ff00 1px, transparent 1px), linear-gradient(90deg, #00ff00 1px, transparent 1px)",
-                  backgroundSize: "100px 100px",
-                }}
-              />
-            </div>
-
-            {/* Territory Glow Layer (New) - Rendered underneath nodes */}
-            {nodes.map((node) => {
-              if (!node.controlledById) return null;
-              const color = getTeamColor(node.controlledById);
-              return (
-                <div
-                  key={`glow-${node.id}`}
-                  className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-1000"
-                  style={{
-                    left: `${node.x}%`,
-                    top: `${node.y}%`,
-                    width: "2000px", // Large radius
-                    height: "2000px",
-                    background: `radial-gradient(circle closest-side, ${color}40 0%, ${color}10 40%, transparent 5%)`,
-                    mixBlendMode: "screen", // Additive blending for glow
-                    zIndex: 15,
-                  }}
-                >
-                  {/* Core intensifier */}
-                  <div
-                    className="absolute inset-0 opacity-50"
-                    style={{
-                      background: `radial-gradient(circle at center, ${color} 0%, transparent 30%)`,
-                    }}
-                  />
-                </div>
-              );
-            })}
-
-            {/* Nodes */}
-            {nodes.map((node) => (
-              <div
-                key={node.id}
-                onClick={(e) => {
-                  if (isSpectator) return;
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setIsLoading(true);
-                  // Small timeout to let state update and overlay render
-                  setTimeout(() => {
-                    router.push(`/node/${node.id}`);
-                  }, 0);
-                }}
-                className={`absolute transform -translate-x-1/2 -translate-y-1/2 group z-20 ${
-                  isSpectator ? "cursor-default" : "cursor-pointer"
-                }`}
-                style={{ left: `${node.x}%`, top: `${node.y}%` }}
-              >
-                <div className="relative flex flex-col items-center">
-                  {/* Pin Icon - OPTIMIZED: No blur, no heavy shadow */}
-                  <div
-                    className="w-24 h-24 clip-path-hexagon flex items-center justify-center bg-black/90 transition-transform duration-150 group-hover:scale-105 border-4"
-                    style={{
-                      borderColor: getTeamColor(node.controlledById),
-                      color: getTeamColor(node.controlledById),
-                      // Removed heavy box-shadow
-                    }}
-                  >
-                    <span className="text-5xl filter drop-shadow-sm">
-                      {getTypeIcon(node.type)}
-                    </span>
-                  </div>
-
-                  {/* Connection Line & Base - Reduced opacity/animation impact */}
-                  <div
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] border border-current rounded-full opacity-10 pointer-events-none"
-                    style={{ color: getTeamColor(node.controlledById) }}
-                  ></div>
-
-                  {/* Label - Reduced blur */}
-                  <div
-                    className="mt-4"
-                    style={{ color: getTeamColor(node.controlledById) }}
-                  >
-                    <div className="text-base font-black uppercase tracking-widest bg-black/90 px-4 py-1 border border-current shadow-sm text-center whitespace-nowrap">
-                      {node.name}
-                    </div>
-                    <div className="text-xs text-center bg-black/90 text-white px-2 mt-1 rounded-full inline-block font-bold border border-zinc-800">
-                      {node.captureRate} kg/min
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+            {/* Memoized Map Content */}
+            <MapContent
+              nodes={nodes}
+              teams={teams}
+              isSpectator={isSpectator}
+              onNodeClick={handleNodeClick}
+            />
           </TransformComponent>
         </TransformWrapper>
       </div>
 
-      {/* FAB (Hidden for Spectator) - REPOSITIONED TO BOTTOM CENTER */}
+      {/* FAB */}
       {!isSpectator && (
         <div className="absolute bottom-32 left-1/2 -translate-x-1/2 z-30">
           <button
             onClick={() => setIsScanning(true)}
-            className="group relative w-20 h-20 rounded-full bg-cyan-600/30 text-cyan-300 border-2 border-cyan-400 flex items-center justify-center overflow-hidden transition-all hover:scale-105 active:scale-95 hover:bg-cyan-500 hover:text-black backdrop-blur-xl shadow-lg shadow-cyan-900/50"
+            // backdrop-blur-xl -> bg-black/80
+            className="group relative w-20 h-20 rounded-full bg-black/80 text-cyan-300 border-2 border-cyan-400 flex items-center justify-center overflow-hidden transition-all hover:scale-105 active:scale-95 hover:bg-cyan-900 hover:text-white shadow-lg shadow-cyan-900/50"
           >
-            {/* Radar Sweep Effect */}
-            <div className="absolute inset-0 bg-linear-to-tr from-transparent via-cyan-400/30 to-transparent animate-spin-slow opacity-0 group-hover:opacity-100" />
+            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-cyan-400/30 to-transparent animate-spin-slow opacity-0 group-hover:opacity-100" />
             <Target className="w-10 h-10 relative z-10" />
-            <div className="absolute -bottom-8 right-full w-40 text-right mr-6 text-sm text-cyan-300 font-black opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none bg-black/80 px-2 rounded">
+            <div className="absolute -bottom-8 right-full w-40 text-right mr-6 text-sm text-cyan-300 font-black opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none bg-black/90 px-2 rounded">
               広域スキャン開始 &gt;&gt;
             </div>
           </button>
         </div>
       )}
 
-      {/* Global Scanner Overlay */}
+      {/* Scanner Overlay */}
       {isScanning && !isSpectator && (
         <QRScanner onScan={onGlobalScan} onClose={() => setIsScanning(false)} />
       )}
 
-      {/* HUD: Bottom Log (Fixed z-30) */}
-      <div className="absolute bottom-0 left-0 w-full md:w-1/2 h-1/3 bg-linear-to-t from-black via-black/80 to-transparent p-4 pb-8 flex flex-col justify-end pointer-events-none z-20">
+      {/* Bottom Log */}
+      <div className="absolute bottom-0 left-0 w-full md:w-1/2 h-1/3 bg-gradient-to-t from-black via-black/90 to-transparent p-4 pb-8 flex flex-col justify-end pointer-events-none z-20">
         <div className="flex items-center gap-2 mb-2 opacity-80 pl-4 border-l-2 border-green-500">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
           <span className="text-[10px] text-green-400 tracking-widest font-bold">
             SYSTEM LOG // ENCRYPTED
           </span>
         </div>
-        <div className="flex flex-col-reverse h-full overflow-hidden mask-image-gradient border-l border-zinc-700/50 pl-4 bg-black/20 backdrop-blur-sm rounded-r-lg">
+        {/* backdrop-blur削除 -> bg-black/40 */}
+        <div className="flex flex-col-reverse h-full overflow-hidden mask-image-gradient border-l border-zinc-700/50 pl-4 bg-black/40 rounded-r-lg">
           {logs.map((log) => (
             <div
               key={log.id}
