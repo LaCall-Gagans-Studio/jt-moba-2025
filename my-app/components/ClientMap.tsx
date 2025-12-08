@@ -90,7 +90,7 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
     // myTeam を依存配列から除外します（これがエラーの原因です）
     // 私たちは「URLが変わった時」に反応したいのであって、「myTeamが変わった時」に反応したいわけではありません
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, initialTeams, isSpectator])
+  }, [searchParams, initialTeams, isSpectator]) // optimized deps // optimized deps
 
   const onGlobalScan = (data: string) => {
     if (data) {
@@ -106,7 +106,7 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
                 toast.success("セキュリティ認証成功: アクセス権限取得")
                 return
             }
-        } catch (e) {
+        } catch {
             // Fallback for old format or invalid data
             console.log("Legacy format or invalid JSON")
         }
@@ -236,6 +236,31 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
         </div>
       </div>
 
+      {/* Territory Control Bar (New) */}
+      <div className="absolute top-[80px] left-0 w-full z-20 flex h-2 bg-zinc-900/50 backdrop-blur-sm shadow-lg overflow-hidden border-y border-white/5">
+        {(() => {
+            const totalNodes = nodes.length
+            if (totalNodes === 0) return null
+            return teams.map(team => {
+                const count = nodes.filter(n => n.controlledById === team.id).length
+                if (count === 0) return null
+                const width = (count / totalNodes) * 100
+                return (
+                    <div 
+                        key={team.id}
+                        className="h-full transition-all duration-500 ease-in-out relative group"
+                        style={{ width: `${width}%`, backgroundColor: team.color }}
+                    >
+                         {/* Shimmer effect */}
+                        <div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] animate-shimmer" />
+                    </div>
+                )
+            })
+        })()}
+        {/* Neutral Space */}
+        <div className="flex-1 bg-zinc-800/30 h-full" />
+      </div>
+
       {/* Main Map Area with Zoom/Pan */}
       <div className="absolute inset-0 z-10 w-full h-full bg-zinc-900">
         <TransformWrapper
@@ -271,6 +296,32 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
                 }}
               />
             </div>
+
+            {/* Territory Glow Layer (New) - Rendered underneath nodes */}
+            {nodes.map(node => {
+                if (!node.controlledById) return null
+                const color = getTeamColor(node.controlledById)
+                return (
+                    <div
+                        key={`glow-${node.id}`}
+                        className="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-1000"
+                        style={{ 
+                            left: `${node.x}%`, 
+                            top: `${node.y}%`,
+                            width: '2000px', // Large radius
+                            height: '2000px',
+                            background: `radial-gradient(circle closest-side, ${color}40 0%, ${color}10 40%, transparent 5%)`,
+                            mixBlendMode: 'screen', // Additive blending for glow
+                            zIndex: 15
+                        }}
+                    >
+                        {/* Core intensifier */}
+                        <div className="absolute inset-0 opacity-50" 
+                             style={{ background: `radial-gradient(circle at center, ${color} 0%, transparent 30%)` }} 
+                        />
+                    </div>
+                )
+            })}
 
             {/* Nodes */}
             {nodes.map(node => (

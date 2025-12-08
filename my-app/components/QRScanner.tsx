@@ -12,9 +12,10 @@ interface QRScannerProps {
 
 export default function QRScanner({ onScan, onClose }: QRScannerProps) {
   const [paused, setPaused] = useState(false)
+  const [isExiting, setIsExiting] = useState(false)
 
   const handleScan = (detected: any[]) => {
-    if (paused) return
+    if (paused || isExiting) return
     if (detected && detected.length > 0) {
       const value = detected[0].rawValue
       setPaused(true)
@@ -24,8 +25,20 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
     }
   }
 
+  const handleClose = () => {
+    setIsExiting(true)
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/90 backdrop-blur-sm">
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className={`fixed inset-0 z-50 flex flex-col bg-black/90 backdrop-blur-sm transition-opacity duration-300 ${isExiting ? 'opacity-0' : 'opacity-100'}`}
+      onTransitionEnd={() => {
+        if (isExiting) onClose()
+      }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between p-4 bg-black/50 border-b border-white/10 z-20">
         <div className="flex items-center gap-2">
@@ -33,8 +46,9 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
           <span className="text-red-500 font-mono text-sm tracking-widest">SYSTEM ACTIVE</span>
         </div>
         <button 
-          onClick={onClose}
-          className="p-2 text-zinc-400 hover:text-white transition-colors"
+          onClick={handleClose}
+          className="p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all backdrop-blur-md border border-white/10 shadow-lg active:scale-95"
+          aria-label="Close Scanner"
         >
           <X className="w-6 h-6" />
         </button>
@@ -82,6 +96,6 @@ export default function QRScanner({ onScan, onClose }: QRScannerProps) {
           Align unit QR code within the frame to initiate protocol.
         </p>
       </div>
-    </div>
+    </motion.div>
   )
 }

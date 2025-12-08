@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { Shield, Zap, Lock, Crosshair } from 'lucide-react'
+import { Shield, Zap, Lock, Crosshair, X } from 'lucide-react'
 import QRScanner from './QRScanner'
 import { motion } from 'framer-motion'
 
@@ -161,6 +161,14 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
 
   return (
     <div className="flex flex-col items-center gap-6 w-full max-w-md relative font-mono">
+      {/* Close Button */}
+      <button 
+        onClick={() => router.push('/game')}
+        className="absolute top-4 right-4 z-50 p-2 bg-black/50 text-white rounded-full hover:bg-black/80 transition-all backdrop-blur-sm border border-white/10 shadow-lg active:scale-95"
+        aria-label="Close"
+      >
+        <X className="w-6 h-6" />
+      </button>
       {/* Scanner Modal */}
       {isScanning && (
         <QRScanner 
