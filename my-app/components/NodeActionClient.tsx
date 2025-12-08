@@ -23,8 +23,18 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
   const router = useRouter()
   const searchParams = useSearchParams()
   
-  // Check verification status
-  const isVerified = searchParams.get('verified') === 'true'
+  // Check verification status from SessionStorage
+  const [isVerified, setIsVerified] = useState(false)
+  const [secretKey, setSecretKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Check session storage for secret key
+    const secret = sessionStorage.getItem(`node-secret-${node.id}`)
+    if (secret) {
+        setIsVerified(true)
+        setSecretKey(secret)
+    }
+  }, [node.id])
 
   useEffect(() => {
     // Restore team from local storage
@@ -61,7 +71,7 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
       const res = await fetch('/api/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId: node.id, teamName: selectedTeam })
+        body: JSON.stringify({ nodeId: node.id, teamName: selectedTeam, secret: secretKey })
       })
       const data = await res.json()
 

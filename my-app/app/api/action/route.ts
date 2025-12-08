@@ -8,11 +8,11 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { nodeId, teamName } = body
+    const { nodeId, teamName, secret } = body
 
     // 1. 入力チェック
-    if (!nodeId || !teamName) {
-      return NextResponse.json({ error: 'Missing nodeId or teamName' }, { status: 400 })
+    if (!nodeId || !teamName || !secret) {
+      return NextResponse.json({ error: 'Missing nodeId, teamName or secret' }, { status: 400 })
     }
 
     // 2. データ取得
@@ -28,6 +28,11 @@ export async function POST(req: NextRequest) {
     // 3. 存在チェック
     if (!node || !team) {
       return NextResponse.json({ error: 'Node or Team not found' }, { status: 404 })
+    }
+
+    // 認証チェック
+    if (node.secretKey !== secret) {
+        return NextResponse.json({ error: 'Invalid secret key' }, { status: 403 })
     }
 
     // 4. ロジック分岐 (敵拠点なら制圧、自軍拠点なら回収)
