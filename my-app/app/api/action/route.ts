@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
         })
       ])
 
-      const logMessage = `【エリア制圧】${team.name}チームがエリア「${node.name}」を制圧！資源 ${captureBonus}kg (${node.type}) を確保！`
+      const logMessage = `【エリア制圧】${team.name}チームがエリア「${node.name}」を制圧！資源 ${captureBonus}g (${node.type}) を確保！`
       const linkLog = await prisma.auditLog.create({
         data: {
           message: logMessage,
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         action: 'CAPTURE',
-        message: `エリア「${node.name}」を制圧！(ボーナス +${captureBonus}kg)`,
+        message: `エリア「${node.name}」を制圧！(ボーナス +${captureBonus}g)`,
         node: updatedNode,
       })
 
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
         })
       }
 
-      // 巡回ボーナス (固定 5kg)
+      // 巡回ボーナス (固定 5g)
       const patrolBonus = 5
 
       // チームスコア更新 (トランザクション)
@@ -157,7 +157,7 @@ export async function POST(req: NextRequest) {
       })
 
       // ログ作成
-      const logMessage = `【定期巡回】${team.name}チームが${node.name}の安全を確認。ボーナス ${patrolBonus}kg を受領。`
+      const logMessage = `【定期巡回】${team.name}チームが${node.name}の安全を確認。ボーナス ${patrolBonus}g を受領。`
       const linkLog = await prisma.auditLog.create({
         data: {
           message: logMessage,
@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
        return NextResponse.json({
         success: true,
         action: 'PATROL',
-        message: `巡回完了: 物資 ${patrolBonus}kg を受領`,
+        message: `巡回完了: 物資 ${patrolBonus}g を受領`,
         amount: patrolBonus,
       })
     }
