@@ -116,6 +116,12 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
     }
   }
 
+  // Keep teams in ref to access inside Pusher callbacks without re-subscribing
+  const teamsRef = useRef(teams)
+  useEffect(() => {
+    teamsRef.current = teams
+  }, [teams])
+
   useEffect(() => {
     // Subscribe to Pusher
     const channel = pusherClient.subscribe('game-channel')
@@ -123,7 +129,7 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
     channel.bind('map-update', (data: any) => {
       setNodes((prev) => prev.map(n => 
         n.id === data.nodeId 
-          ? { ...n, controlledById: data.teamId, controlledBy: teams.find(t => t.id === data.teamId) || n.controlledBy }
+          ? { ...n, controlledById: data.teamId, controlledBy: teamsRef.current.find(t => t.id === data.teamId) || n.controlledBy }
           : n
       ))
     })
@@ -135,19 +141,22 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
     })
 
     channel.bind('log-new', (data: any) => {
-      setLogs((prev) => [{
-        id: data.id,
-        message: data.message,
-        createdAt: new Date(data.createdAt),
-        teamId: null, // simplified
-        teamColor: data.teamColor
-      }, ...prev].slice(0, 50)) 
+      setLogs((prev) => {
+        if (prev.some(log => log.id === data.id)) return prev
+        return [{
+          id: data.id,
+          message: data.message,
+          createdAt: new Date(data.createdAt),
+          teamId: null, // simplified
+          teamColor: data.teamColor
+        }, ...prev].slice(0, 50)
+      }) 
     })
 
     return () => {
       pusherClient.unsubscribe('game-channel')
     }
-  }, [teams])
+  }, [])
 
   // Helper to get team color
   const getTeamColor = (teamId: string | null) => {
@@ -159,10 +168,14 @@ export default function ClientMap({ initialNodes, initialTeams, initialLogs }: C
   // Define icon based on type
   const getTypeIcon = (type: string) => {
       switch(type) {
-        case 'MEAT': return '🥩'
+        case 'MEAT': return '🍖'
         case 'VEGETABLE': return '🥬'
+        case 'RICE': return '🍚'
+        case 'NOODLE': return '🍜'
+        case 'BREAD': return '🥖'
+        case 'SEAFOOD': return '🦐'
         case 'SPICE': return '🌶️'
-        case 'WATER': return '💧'
+        case 'DAIRY': return '🧀'
         default: return '📦'
       }
   }

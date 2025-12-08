@@ -22,16 +22,20 @@ export default function QRPrintPage() {
 
   const getTypeIcon = (type: string) => {
     switch(type) {
-        case 'MEAT': return '🥩'
+        case 'MEAT': return '🍖'
         case 'VEGETABLE': return '🥬'
+        case 'RICE': return '🍚'
+        case 'NOODLE': return '🍜'
+        case 'BREAD': return '🥖'
+        case 'SEAFOOD': return '🦐'
         case 'SPICE': return '🌶️'
-        case 'WATER': return '💧'
+        case 'DAIRY': return '🧀'
         default: return '📦'
     }
 }
 
   return (
-    <div className="min-h-screen bg-white text-black p-8 font-sans">
+    <div className="min-h-screen bg-white text-black p-8 font-sans overflow-y-scroll">
         {/* Helper Header for Print */}
         <div className="print:hidden mb-8 flex items-center justify-between bg-zinc-100 p-4 rounded border">
             <div>

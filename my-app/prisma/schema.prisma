@@ -14,6 +14,17 @@ model Team {
   score     Int        @default(0)
   nodes     Node[]
   auditLogs AuditLog[]
+  resources TeamResource[]
+}
+
+model TeamResource {
+  id        String   @id @default(uuid())
+  teamId    String
+  team      Team     @relation(fields: [teamId], references: [id])
+  type      String
+  amount    Int      @default(0)
+
+  @@unique([teamId, type])
 }
 
 model Node {

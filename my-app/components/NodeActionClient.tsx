@@ -149,8 +149,12 @@ export default function NodeActionClient({ node, teams }: { node: any, teams: an
     switch(type) {
       case 'MEAT': return '肉類 (MEAT)'
       case 'VEGETABLE': return '野菜 (VEG)'
+      case 'RICE': return '穀物 (RICE)'
+      case 'NOODLE': return '麺類 (NOODLE)'
+      case 'BREAD': return 'パン (BREAD)'
+      case 'SEAFOOD': return '魚介 (FISH)'
       case 'SPICE': return '香辛料 (SPICE)'
-      case 'WATER': return '飲料水 (H2O)'
+      case 'DAIRY': return '乳製品 (DAIRY)'
       default: return '物資 (UNKNOWN)'
     }
   }

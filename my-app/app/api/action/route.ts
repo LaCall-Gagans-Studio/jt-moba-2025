@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
 
     if (isEnemyOrNeutral) {
       // --- CAPTURE (制圧) ---
+      // 1. 拠点を自軍のものにする
       const updatedNode = await prisma.node.update({
         where: { id: nodeId },
         data: {
@@ -43,7 +44,32 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      const logMessage = `【作戦報告】${team.name}小隊がエリア「${node.name}」を制圧完了！`
+      // 2. 制圧ボーナス (即座にCaptureRate分のスコア加算)
+      const captureBonus = node.captureRate
+      
+      // トランザクションで整合性担保
+      const [updatedTeam, _] = await prisma.$transaction([
+        prisma.team.update({
+          where: { id: team.id },
+          data: { score: { increment: captureBonus } }
+        }),
+        prisma.teamResource.upsert({
+          where: {
+            teamId_type: {
+              teamId: team.id,
+              type: node.type
+            }
+          },
+          update: { amount: { increment: captureBonus } },
+          create: {
+            teamId: team.id,
+            type: node.type,
+            amount: captureBonus
+          }
+        })
+      ])
+
+      const logMessage = `【エリア制圧】${team.name}チームがエリア「${node.name}」を制圧！資源 ${captureBonus}kg (${node.type}) を確保！`
       const linkLog = await prisma.auditLog.create({
         data: {
           message: logMessage,
@@ -51,12 +77,17 @@ export async function POST(req: NextRequest) {
         },
       })
 
-      // Pusher通知
+      // Pusher通知 (制圧 + スコア更新)
       await pusherServer.trigger('game-channel', 'map-update', {
         type: 'CAPTURE',
         nodeId: node.id,
         teamId: team.id,
         teamColor: team.color,
+      })
+      
+      await pusherServer.trigger('game-channel', 'score-update', {
+        teamId: team.id,
+        newScore: updatedTeam.score,
       })
 
       await pusherServer.trigger('game-channel', 'log-new', {
@@ -69,49 +100,59 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         action: 'CAPTURE',
-        message: `エリア「${node.name}」の制圧に成功。`,
+        message: `エリア「${node.name}」を制圧！(ボーナス +${captureBonus}kg)`,
         node: updatedNode,
       })
 
     } else {
-      // --- HARVEST (回収) ---
+      // --- PATROL (巡回) ---
       const now = new Date()
       const lastHarvest = new Date(node.lastHarvestedAt)
       const diffMs = now.getTime() - lastHarvest.getTime()
       const diffMinutes = Math.floor(diffMs / 60000)
 
+      // クールダウン (1分)
       if (diffMinutes < 1) {
         return NextResponse.json({
           success: false,
-          action: 'HARVEST',
-          message: '資源再生サイクル中。待機せよ。',
+          action: 'PATROL',
+          message: '巡回済みです。次の巡回まで待機してください。',
         })
       }
 
-      const amount = Math.floor(diffMinutes * node.captureRate)
-      if (amount <= 0) {
-         return NextResponse.json({
-          success: false,
-          action: 'HARVEST',
-          message: '回収可能な資源なし。',
-        })
-      }
+      // 巡回ボーナス (固定 5kg)
+      const patrolBonus = 5
 
-      // チームスコア更新
-      const updatedTeam = await prisma.team.update({
-        where: { id: team.id },
-        data: { score: { increment: amount } },
-      })
+      // チームスコア更新 (トランザクション)
+      const [updatedTeam, _] = await prisma.$transaction([
+          prisma.team.update({
+            where: { id: team.id },
+            data: { score: { increment: patrolBonus } },
+          }),
+          prisma.teamResource.upsert({
+            where: {
+                teamId_type: {
+                    teamId: team.id,
+                    type: node.type
+                }
+            },
+            update: { amount: { increment: patrolBonus } },
+            create: {
+                teamId: team.id,
+                type: node.type,
+                amount: patrolBonus
+            }
+          })
+      ])
 
-      // 最終回収時刻更新
+      // 最終アクション時刻更新
       await prisma.node.update({
         where: { id: nodeId },
         data: { lastHarvestedAt: now },
       })
 
       // ログ作成
-      const unit = node.type === 'WATER' ? 'L' : 'kg'
-      const logMessage = `【物資回収】${team.name}小隊が${node.name}にて${node.type}を${amount}${unit}確保。`
+      const logMessage = `【定期巡回】${team.name}チームが${node.name}の安全を確認。ボーナス ${patrolBonus}kg を受領。`
       const linkLog = await prisma.auditLog.create({
         data: {
           message: logMessage,
@@ -134,9 +175,9 @@ export async function POST(req: NextRequest) {
 
        return NextResponse.json({
         success: true,
-        action: 'HARVEST',
-        message: `物資回収完了: ${amount}${unit} (${node.type})`,
-        amount: amount,
+        action: 'PATROL',
+        message: `巡回完了: 物資 ${patrolBonus}kg を受領`,
+        amount: patrolBonus,
       })
     }
 
