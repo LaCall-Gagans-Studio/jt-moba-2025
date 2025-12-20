@@ -152,12 +152,17 @@ export default function AdminDashboard() {
   };
 
   // ゲーム進行操作系
-  const handleGameControl = async (action: "START" | "RESET") => {
+  const handleGameControl = async (action: "START" | "RESET" | "FINISH") => {
     // アクションに応じたメッセージを設定
-    const message =
-      action === "START"
-        ? "ゲームを開始しますか？"
-        : "警告: 全チームのスコア、資源、ログが完全に消去されます。\n本当によろしいですか？";
+    let message = "";
+    if (action === "START") {
+      message = "ゲームを開始しますか？";
+    } else if (action === "FINISH") {
+      message = "ゲームを終了しますか？（資源の増加が停止します）";
+    } else {
+      message =
+        "警告: 全チームのスコア、資源、ログが完全に消去されます。\n本当によろしいですか？";
+    }
 
     // 確認ダイアログを表示（キャンセルされたら処理を中断）
     if (!confirm(message)) return;
@@ -206,8 +211,14 @@ export default function AdminDashboard() {
               START
             </button>
             <button
+              onClick={() => handleGameControl("FINISH")}
+              className="bg-amber-900/30 border border-amber-600 text-amber-100 p-2 rounded hover:bg-amber-800 transition flex justify-center items-center gap-1"
+            >
+              FINISH
+            </button>
+            <button
               onClick={() => handleGameControl("RESET")}
-              className="bg-red-900/30 border border-red-600 text-red-100 p-2 rounded hover:bg-red-800 transition flex justify-center items-center gap-1"
+              className="bg-red-900/30 border border-red-600 text-red-100 p-2 rounded col-span-2 hover:bg-red-800 transition flex justify-center items-center gap-1"
             >
               RESET
             </button>

@@ -48,3 +48,8 @@ model AuditLog {
   teamId    String?
   team      Team?    @relation(fields: [teamId], references: [id])
 }
+
+model GameSettings {
+  id           String  @id @default(uuid())
+  isGameActive Boolean @default(false)
+}
