@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import QRScanner from "./QRScanner";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import LoadingOverlay from "./ui/LoadingOverlay";
+import NodeModal from "./NodeModal";
 
 // --- Types ---
 type Team = {
@@ -200,6 +201,9 @@ export default function ClientMap({
   const [isLoading, setIsLoading] = useState(false);
   const [myTeam, setMyTeam] = useState<string>("");
 
+  const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [nodeSecret, setNodeSecret] = useState<string | undefined>(undefined);
+
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -261,10 +265,17 @@ export default function ClientMap({
       try {
         const parsed = JSON.parse(data);
         if (parsed.id && parsed.secret) {
-          sessionStorage.setItem(`node-secret-${parsed.id}`, parsed.secret);
+          // sessionStorage.setItem(`node-secret-${parsed.id}`, parsed.secret); // No longer needed
           setIsScanning(false);
-          router.push(`/node/${parsed.id}`);
-          toast.success("セキュリティ認証成功: アクセス権限取得");
+
+          const targetNode = nodes.find((n) => n.id === parsed.id);
+          if (targetNode) {
+            setNodeSecret(parsed.secret);
+            setSelectedNode(targetNode);
+            toast.success("セキュリティ認証成功: アクセス権限取得");
+          } else {
+            toast.error("不明なノードIDです");
+          }
           return;
         }
       } catch {
@@ -345,12 +356,11 @@ export default function ClientMap({
       if (isSpectator) return;
       e.preventDefault();
       e.stopPropagation();
-      setIsLoading(true);
-      setTimeout(() => {
-        router.push(`/node/${node.id}`);
-      }, 0);
+      // Reset secret when just clicking
+      setNodeSecret(undefined);
+      setSelectedNode(node);
     },
-    [isSpectator, router]
+    [isSpectator]
   );
 
   return (
@@ -536,6 +546,20 @@ export default function ClientMap({
           })}
         </div>
       </div>
+
+      {/* Node Modal */}
+      {selectedNode && (
+        <NodeModal
+          node={selectedNode}
+          teams={teams}
+          myTeam={myTeam}
+          secretKey={nodeSecret}
+          onClose={() => {
+            setSelectedNode(null);
+            setNodeSecret(undefined);
+          }}
+        />
+      )}
     </div>
   );
 }
