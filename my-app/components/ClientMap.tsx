@@ -354,7 +354,7 @@ export default function ClientMap({
   );
 
   return (
-    <div className="relative w-full h-screen text-white bg-zinc-950 overflow-hidden font-mono tracking-tight selection:bg-cyan-500/30">
+    <div className="relative w-full h-[100dvh] text-white bg-zinc-950 overflow-hidden font-mono tracking-tight selection:bg-cyan-500/30">
       {isLoading && <LoadingOverlay />}
 
       {/* Screen Overlays */}
@@ -502,7 +502,7 @@ export default function ClientMap({
       )}
 
       {/* Bottom Log */}
-      <div className="absolute bottom-0 left-0 w-full md:w-1/2 h-1/3 bg-gradient-to-t from-black via-black/90 to-transparent p-4 pb-8 flex flex-col justify-end pointer-events-none z-20">
+      <div className="absolute bottom-0 left-0 w-full md:w-1/2 h-1/3 bg-gradient-to-t from-black via-black/90 to-transparent p-4 pb-24 md:pb-8 flex flex-col justify-end pointer-events-none z-20">
         <div className="flex items-center gap-2 mb-2 opacity-80 pl-4 border-l-2 border-green-500">
           <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
           <span className="text-[10px] text-green-400 tracking-widest font-bold">
