@@ -169,7 +169,7 @@ const MapContent = React.memo(
                     {node.name}
                   </div>
                   <div className="text-xs text-center bg-black/90 text-white px-2 mt-1 rounded-full inline-block font-bold border border-zinc-800">
-                    {node.captureRate} kg/min
+                    {node.captureRate} yen/min
                   </div>
                 </div>
               </div>
