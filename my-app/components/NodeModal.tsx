@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Shield, Zap, Lock, Crosshair, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation"; // Needed for router.refresh() if we want to refresh map data? Or maybe we can just callback?
+import { useRouter } from "next/navigation";
 
 // Types
 type Team = {
@@ -41,6 +41,7 @@ export default function NodeModal({
   secretKey,
   onClose,
 }: NodeModalProps) {
+  const [currentNode, setCurrentNode] = useState<Node>(node);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
 
@@ -53,6 +54,11 @@ export default function NodeModal({
   // We assume myTeam is valid if passed.
 
   const router = useRouter();
+
+  // Sync state with props
+  useEffect(() => {
+    setCurrentNode(node);
+  }, [node]);
 
   // Clean up interval on unmount
   useEffect(() => {
@@ -73,7 +79,7 @@ export default function NodeModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          nodeId: node.id,
+          nodeId: currentNode.id,
           teamName: myTeam,
           secret: secretKey,
         }),
@@ -89,10 +95,17 @@ export default function NodeModal({
           toast.success(data.message);
           setResult(data);
           setProgress(0); // Reset progress
-          // We can trigger a refresh or let Pusher handle the update.
-          // Since ClientMap listens to Pusher, it should update automatically?
-          // But router.refresh() ensures data consistency if Pusher is missed or for other data.
-          // However, router.refresh() reloads the page props.
+
+          // Optimistic UI Update: Immediately reflect change
+          const newTeam = teams.find((t) => t.name === myTeam);
+          if (newTeam) {
+            setCurrentNode((prev) => ({
+              ...prev,
+              controlledById: newTeam.id,
+              controlledBy: newTeam,
+            }));
+          }
+
           router.refresh();
 
           // Optionally close modal after success? Or let user see result?
@@ -138,8 +151,9 @@ export default function NodeModal({
   };
 
   const currentTeam = teams.find((t) => t.name === myTeam);
-  const isEnemy = node.controlledBy?.id && node.controlledBy?.name !== myTeam;
-  const isFriendly = node.controlledBy?.name === myTeam;
+  const isEnemy =
+    currentNode.controlledBy?.id && currentNode.controlledBy?.name !== myTeam;
+  const isFriendly = currentNode.controlledBy?.name === myTeam;
 
   // Verification check: controlled by friendly OR we have the secret key
   const isVerified = isFriendly || !!secretKey;
@@ -206,12 +220,12 @@ export default function NodeModal({
                 className="text-3xl font-black text-white uppercase tracking-tighter"
                 style={{ textShadow: "0 0 10px rgba(255,255,255,0.5)" }}
               >
-                {node.name}
+                {currentNode.name}
               </h1>
               <div className="mt-2 inline-flex items-center px-3 py-1 bg-zinc-900 border-l-2 border-r-2 border-zinc-700 text-xs text-zinc-300 gap-2">
                 <span className="opacity-50">RESOURCE:</span>
                 <span className="font-bold text-cyan-300">
-                  {getTypeLabel(node.type)}
+                  {getTypeLabel(currentNode.type)}
                 </span>
               </div>
             </div>
@@ -221,11 +235,15 @@ export default function NodeModal({
               {/* Status Bar */}
               <div
                 className="absolute top-0 left-0 w-1.5 h-full"
-                style={{ backgroundColor: node.controlledBy?.color || "#555" }}
+                style={{
+                  backgroundColor: currentNode.controlledBy?.color || "#555",
+                }}
               ></div>
               <div
                 className="absolute top-0 right-0 w-1.5 h-full"
-                style={{ backgroundColor: node.controlledBy?.color || "#555" }}
+                style={{
+                  backgroundColor: currentNode.controlledBy?.color || "#555",
+                }}
               ></div>
 
               <CardContent className="pt-6 relative z-10">
@@ -233,15 +251,15 @@ export default function NodeModal({
                   <span className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 mb-1">
                     CURRENT CONTROL
                   </span>
-                  {node.controlledBy ? (
+                  {currentNode.controlledBy ? (
                     <motion.span
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="text-3xl font-bold flex items-center gap-3 drop-shadow-md"
-                      style={{ color: node.controlledBy.color }}
+                      style={{ color: currentNode.controlledBy.color }}
                     >
                       <Shield className="w-6 h-6" />
-                      {node.controlledBy.name}
+                      {currentNode.controlledBy.name}
                     </motion.span>
                   ) : (
                     <span className="text-3xl font-bold text-zinc-500 tracking-widest">

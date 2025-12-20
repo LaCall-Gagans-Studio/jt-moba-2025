@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       }),
     ]);
 
-    const logMessage = `【エリア制圧】${team.name}チームがエリア「${node.name}」を制圧！資源 ${captureBonus}g (${node.type}) を確保！`;
+    const logMessage = `【エリア制圧】${team.name}チームがエリア「${node.name}」を制圧！資源 ${captureBonus}円 (${node.type}) を確保！`;
     const linkLog = await prisma.auditLog.create({
       data: {
         message: logMessage,
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       action: "CAPTURE",
-      message: `エリア「${node.name}」を制圧！(ボーナス +${captureBonus}g)`,
+      message: `エリア「${node.name}」を制圧！(ボーナス +${captureBonus}円)`,
       node: updatedNode,
     });
   } catch (error) {
