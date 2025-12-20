@@ -205,6 +205,11 @@ export default function ClientMap({
 
   const isSpectator = searchParams.get("mode") === "spectator";
 
+  // 追加: マウント時にサーバーデータを再取得（キャッシュ対策）
+  useEffect(() => {
+    router.refresh();
+  }, []);
+
   // Auto-Login via URL
   useEffect(() => {
     if (isSpectator) return;
@@ -304,6 +309,16 @@ export default function ClientMap({
           ...prev,
         ].slice(0, 50);
       });
+    });
+
+    // 追加: リセットイベントのハンドリング
+    channel.bind("game-reset", () => {
+      toast.info("ゲームがリセットされました。再読み込みします...", {
+        duration: 2000,
+      });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     });
 
     return () => {
