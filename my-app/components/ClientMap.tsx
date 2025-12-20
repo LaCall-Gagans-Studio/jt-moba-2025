@@ -210,6 +210,19 @@ export default function ClientMap({
     router.refresh();
   }, []);
 
+  // Propsが更新されたらStateも同期する
+  useEffect(() => {
+    setNodes(initialNodes);
+  }, [initialNodes]);
+
+  useEffect(() => {
+    setTeams(initialTeams);
+  }, [initialTeams]);
+
+  useEffect(() => {
+    setLogs(initialLogs);
+  }, [initialLogs]);
+
   // Auto-Login via URL
   useEffect(() => {
     if (isSpectator) return;
