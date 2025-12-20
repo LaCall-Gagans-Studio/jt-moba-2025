@@ -208,7 +208,7 @@ export default function ClientMap({
   // 追加: マウント時にサーバーデータを再取得（キャッシュ対策）
   useEffect(() => {
     router.refresh();
-  }, []);
+  }, [router]);
 
   // Propsが更新されたらStateも同期する
   useEffect(() => {
@@ -354,7 +354,7 @@ export default function ClientMap({
   );
 
   return (
-    <div className="relative w-full h-[100dvh] text-white bg-zinc-950 overflow-hidden font-mono tracking-tight selection:bg-cyan-500/30">
+    <div className="relative w-full h-dvh text-white bg-zinc-950 overflow-hidden font-mono tracking-tight selection:bg-cyan-500/30">
       {isLoading && <LoadingOverlay />}
 
       {/* Screen Overlays */}
@@ -511,27 +511,29 @@ export default function ClientMap({
         </div>
         {/* backdrop-blur削除 -> bg-black/40 */}
         <div className="flex flex-col-reverse h-full overflow-hidden mask-image-gradient border-l border-zinc-700/50 pl-4 bg-black/40 rounded-r-lg">
-          {logs.map((log) => (
-            <div
-              key={log.id}
-              className="mb-2 text-xs font-mono flex items-start animate-in slide-in-from-left-5"
-            >
-              <span className="text-zinc-400 mr-3 shrink-0 font-bold">
-                [{format(new Date(log.createdAt), "HH:mm:ss")}]
-              </span>
-              <span
-                style={{
-                  color: log.teamColor || "#ddd",
-                  textShadow: log.teamColor
-                    ? `0 0 10px ${log.teamColor}aa`
-                    : "none",
-                  fontWeight: "bold",
-                }}
+          {logs.map((log) => {
+            const color = log.teamColor || log.team?.color || "#ddd";
+            return (
+              <div
+                key={log.id}
+                className="mb-2 text-xs font-mono flex items-start animate-in slide-in-from-left-5"
               >
-                {log.message}
-              </span>
-            </div>
-          ))}
+                <span className="text-zinc-400 mr-3 shrink-0 font-bold">
+                  [{format(new Date(log.createdAt), "HH:mm:ss")}]
+                </span>
+                <span
+                  style={{
+                    color: color,
+                    textShadow:
+                      color !== "#ddd" ? `0 0 10px ${color}aa` : "none",
+                    fontWeight: "bold",
+                  }}
+                >
+                  {log.message}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
